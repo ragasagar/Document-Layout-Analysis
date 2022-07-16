@@ -1,0 +1,51 @@
+COCOLakeData.json
+COCOQueryData.json
+COCOTrainData.json
+COCOValData.json
+com_model_weights
+# configs
+# dataset.py
+DocBank
+DocBank_500K_ori_img
+DocBank_500K_txt
+DocBank_500K_txt-20220524T094440Z-001.zip
+DocBankLoader
+FILENAME
+fl2mi_model_weights
+flcmi_new_weight
+images.001
+images.zip
+images.zip.001
+img
+lake_data_img
+lake_data_txt_anno
+model_final copy.pth
+model_final.pth
+model_weights
+new_model_weights
+new_query_data_img
+new_query_data_txt_anno
+publaynet
+publynet
+__pycache__
+query_data_img
+query_data_txt_anno
+random_model_weights
+# requirements.txt
+screen.log
+# submod_selection.py
+subsetvenv
+targeted_learning_demo
+# targeted_learning.py
+# target_feature_selection.py
+test.csv
+test_data_img
+test_data_txt_anno
+# test.py
+train_data_img
+train_data_txt_anno
+txt
+# utils
+val_data_img
+val_data_txt_anno
+X101
