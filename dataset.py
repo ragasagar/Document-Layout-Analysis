@@ -25,14 +25,6 @@ def create_dataset():
     txt_anno_path = 'DocBank_500K_txt'
     arrange_data("DocBank/DocBank_samples/DocBank_samples", img_path, txt_anno_path)
 
-
-
-    txt_dir = 'txt'
-    img_dir = 'img'
-    # loader = DocBankLoader(txt_dir=txt_dir, img_dir=img_dir)
-
-    # converter = DocBankConverter(loader)
-
     source_dirs = ("DocBank_500K_ori_img", "DocBank_500K_txt")
     # source_dirs = ("img", "txt")
     query_data_dirs = ("new_query_data_img", "new_query_data_txt_anno")
@@ -42,10 +34,10 @@ def create_dataset():
     val_data_dirs = ("val_data_img", "val_data_txt_anno")
     split_cfg = {
         "train_ratio":0.1,
-        "val_ratio":0.1,
-        "test_ratio":0.1
-
+        "val_ratio":0.05,
+        "test_ratio":0.05
     }
+    
     split_data(source_dirs, 
             train_dirs= train_data_dirs, 
             query_dirs=query_data_dirs,
@@ -56,29 +48,29 @@ def create_dataset():
     )
 
 
-    query_data_loader = DocBankLoader(txt_dir=query_data_dirs[1], img_dir=query_data_dirs[0])
-    query_data_converter = DocBankConverter(query_data_loader)
-    query_data_examples = query_data_converter.read_all()
+    # query_data_loader = DocBankLoader(txt_dir=query_data_dirs[1], img_dir=query_data_dirs[0])
+    # query_data_converter = DocBankConverter(query_data_loader)
+    # query_data_examples = query_data_converter.read_all()
 
-    query_data_coco = COCOData("COCOQueryData.json",query_data_examples)
-    query_data_coco.convert_to_coco()
-    query_data_coco.save_coco_dataset()
+    # query_data_coco = COCOData("COCOQueryData.json",query_data_examples)
+    # query_data_coco.convert_to_coco()
+    # query_data_coco.save_coco_dataset()
 
-    train_data_loader = DocBankLoader(txt_dir=train_data_dirs[1], img_dir=train_data_dirs[0])
-    train_data_converter = DocBankConverter(train_data_loader)
-    train_data_examples = train_data_converter.read_all()
+    # train_data_loader = DocBankLoader(txt_dir=train_data_dirs[1], img_dir=train_data_dirs[0])
+    # train_data_converter = DocBankConverter(train_data_loader)
+    # train_data_examples = train_data_converter.read_all()
 
-    train_data_coco = COCOData("COCOTrainData.json",train_data_examples)
-    train_data_coco.convert_to_coco()
-    train_data_coco.save_coco_dataset()
+    # train_data_coco = COCOData("COCOTrainData.json",train_data_examples)
+    # train_data_coco.convert_to_coco()
+    # train_data_coco.save_coco_dataset()
 
-    lake_data_loader = DocBankLoader(txt_dir=lake_data_dirs[1], img_dir=lake_data_dirs[0])
-    lake_data_converter = DocBankConverter(lake_data_loader)
-    lake_data_examples = lake_data_converter.read_all()
+    # lake_data_loader = DocBankLoader(txt_dir=lake_data_dirs[1], img_dir=lake_data_dirs[0])
+    # lake_data_converter = DocBankConverter(lake_data_loader)
+    # lake_data_examples = lake_data_converter.read_all()
 
-    lake_data_coco = COCOData("COCOLakeData.json",lake_data_examples)
-    lake_data_coco.convert_to_coco()
-    lake_data_coco.save_coco_dataset()
+    # lake_data_coco = COCOData("COCOLakeData.json",lake_data_examples)
+    # lake_data_coco.convert_to_coco()
+    # lake_data_coco.save_coco_dataset()
 
 
 # create_dataset()

@@ -128,7 +128,7 @@ def store_file(source_img_dir,source_txt_dir,names, index, img_dir, txt_dir):
 
 
 
-def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_dirs, split_cfg):
+def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 10000):
     source_img_dir, source_txt_dir = source_dirs
     names = [f.replace(".txt","") for f in os.listdir(source_txt_dir)]
     print(len(names))
@@ -137,19 +137,15 @@ def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_di
     
     list_index = list(range(0, len(names)))
     random.shuffle(list_index)
-    train_indices = list_index[:1000]
-    # query_indices = list_index[:int(split_cfg['train_ratio']*len(names))]
-    val_indices = list_index[1001:1500]
+    train_indices = list_index[:int(data_size * split_cfg['train_ratio'])]
+    val_index = int((split_cfg['train_ratio']  + split_cfg['val_ratio']) * data_size);
+    val_indices = list_index[int(data_size * split_cfg['train_ratio'] + 1) : val_index]
 
-    # # print(val_indices)
-    # # rem_indices = Diff(Diff(list_index, val_indices), train_indices)
-    test_indices = list_index[1501:2000]
-    lake_indices = list_index[2001:4000]
-
-    # # test_indices = rem_indices[0:int(split_cfg['test_ratio']*len(names))]
-    # # lake_indices =  Diff(rem_indices, test_indices)
-
+    test_index = int(val_index + split_cfg['test_ratio'] * data_size);
+    test_indices = list_index[val_index + 1: test_index];
     
+    lake_indices = list_index[test_index +1:data_size];
+ 
     train_img_dir, train_txt_dir = train_dirs
     query_img_dir, query_txt_dir = query_dirs
     lake_img_dir, lake_txt_dir = lake_dirs
@@ -312,3 +308,10 @@ def find_missclassified_object(result):
                     minAP = value;
     category = category.lower().replace('ap-',"");
     return ('query_data_img/'+ category,[category]) 
+
+
+def get_test_score(result):
+    for k, val in result.items():
+        for key, value in val.items():
+            if(key == "AP"):
+                return value;

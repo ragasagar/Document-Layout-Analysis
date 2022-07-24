@@ -25,7 +25,6 @@ model_weights
 new_model_weights
 new_query_data_img
 new_query_data_txt_anno
-publaynet
 publynet
 __pycache__
 query_data_img
@@ -49,3 +48,16 @@ txt
 val_data_img
 val_data_txt_anno
 X101
+distil-main.zip
+distil-main/
+output/
+publaynet/train
+publaynet/val
+publaynet/output
+publaynet/*.json
+publaynet/*.gz
+publaynet/*.pkl
+train-0.tar.gz
+.vscode/
+final_model_testing/
+publaynet/
