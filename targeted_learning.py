@@ -6,7 +6,7 @@ from tkinter import Image
 from dataset import create_dataset
 import detectron2
 from detectron2.utils.logger import setup_logger
-from target_feature_selection import ImageModel
+from feature_selection import ImageModel
 from utils.coco_util import COCOData
 from utils.submodlib import COM_wrapper, FL1CMI_wrapper, FL1MI_wrapper, Random_wrapper, subset
 from utils.utils import find_missclassified_object, get_test_score
@@ -28,6 +28,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.engine import DefaultPredictor
 from detectron2.data.datasets import register_coco_instances, load_coco_json
+from detectron2.data.datasets.pascal_voc import register_pascal_voc
 from detectron2.evaluation import COCOEvaluator, inference_on_dataset
 from detectron2.data import build_detection_test_loader
 
@@ -109,14 +110,26 @@ def remove_dataset(name):
         DatasetCatalog.remove(name)
         MetadataCatalog.remove(name)
 
+class CocoTrainer(DefaultTrainer):
+    
+  @classmethod
+  def build_evaluator(cls, cfg, dataset_name, output_folder=None):
+
+    if output_folder is None:
+        os.makedirs("coco_eval", exist_ok=True)
+        output_folder = "coco_eval"
+
+    return COCOEvaluator(dataset_name, cfg, False, output_folder)
+
 def create_model(cfg, type="train"):
     if type == "train":
-        trainer = DefaultTrainer(cfg) 
+        trainer = CocoTrainer(cfg) 
         trainer.resume_or_load(resume=False)
         return trainer;
     else:
         print(cfg)
         return ImageModel(cfg);
+
 
 def main():
 
@@ -127,37 +140,47 @@ def main():
 
 
     create_dataset()
-    create_data_loader(val_data_dirs, "COCOValData.json");
-    create_data_loader(test_data_dirs, "COCOTestData.json");
-    create_data_loader(train_data_dirs, "COCOTrainData.json");
+    # create_data_loader(val_data_dirs, "COCOValData.json");
+    # create_data_loader(test_data_dirs, "COCOTestData.json");
+    # create_data_loader(train_data_dirs, "COCOTrainData.json");
     
-
-
-    #initial weight and config path
-    config_file_path = 'X101/X101.yaml'
-    # weights_path = 'X101/model.pth';
-
-
     ## intial initializeation of the parameters
-    register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", ".")
+    register_coco_instances("docbank_seg_train",{}, "PASCAL_VOC/PASCAL_VOC/train_targeted.json", "train_data_img")
     # print(MetadataCatalog.get("train_data_coco"))
-    register_coco_instances("docbank_seg_val",{}, "COCOValData.json", ".")
+    register_coco_instances("docbank_seg_val",{}, "PASCAL_VOC/PASCAL_VOC/val_targeted.json", "val_data_img")
     # print(MetadataCatalog.get("val_data_coco"))
-    register_coco_instances("docbank_seg_test",{}, "COCOTestData.json", ".")
-    
+    register_coco_instances("docbank_seg_test",{}, "PASCAL_VOC/PASCAL_VOC/pascal_test2007.json", "voctest_06-nov-2007/VOCdevkit/VOC2007/JPEGImages")
+    register_pascal_voc("voc3_train", "voctrainval_06-nov-2007/VOCdevkit/VOC2007", "train", "2007");
+    # register_pascal_voc("voc3_val", "/content/voctrainval_06-nov-2007/VOCdevkit/VOC2007", "val", "2007");
+    # register_pascal_voc("voc3_test", "/content/voctest_06-nov-2007/VOCdevkit/VOC2007", "test", "2007");
+
     budget = 2000;
     selection_budget = 20;
     output_dir="final_model_testing"
+    trained_model_weights_path = "coco-weights/model_final.pth";
     number_of_rounds = 100
     selection_strag = "fl1mi";
     private_set = False;
+    #initial weight and config path
+    config_file_path = 'configs/coco/faster_rcnn_R_101_FPN_3x.yaml'
+    prediction_score_threshold = 0.7
+    base_lr = 0.000015
+    max_iter = 2000
+    batch_size = 45
 
+    # Detectron config
     cfg = get_cfg()
     cfg.merge_from_file(config_file_path)
-    cfg.DATASETS.TRAIN = ("docbank_seg_train",)
-    cfg.DATASETS.TEST = ("docbank_seg_test", 'docbank_seg_val' )
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
+    cfg.DATASETS.TRAIN = ("voc3_train",)
+    cfg.DATASETS.TEST = ('docbank_seg_val', )
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = prediction_score_threshold   # set a custom testing threshold
     cfg.OUTPUT_DIR = output_dir;
+    cfg.SOLVER.IMS_PER_BATCH = 4
+    cfg.SOLVER.BASE_LR = base_lr
+    cfg.SOLVER.MAX_ITER = max_iter
+    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 256
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 20
+    cfg.TEST.DETECTIONS_PER_IMAGE = 100
 
     final_test_score = [];
     final_val_score = [];
@@ -167,6 +190,7 @@ def main():
         if(iteration==0):
             print('Initial phase  \n Loading trained model')        
             if(not os.path.exists(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))):
+                cfg.MODEL.WEIGHTS = trained_model_weights_path
                 model = create_model(cfg, "train")
                 model.train()
             
@@ -175,13 +199,13 @@ def main():
 
             model = create_model(cfg, "test")
 
-            evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
+            evaluator = COCOEvaluator("docbank_seg_val", output_dir=output_dir)
+            val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
             val_result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
 
-            evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
-            result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
+            # evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
+            # val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
+            # result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
         else:
             print("training start iteration:", iteration)
             
@@ -196,7 +220,7 @@ def main():
             if(iteration>5):
                 _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", query_path, category)
             else:
-                _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", 'query_data_img/equation', ['equation'])
+                _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", 'query_data_img/aeroplane', ['aeroplane'])
             print(len(query_embeddings))
 
             '''Lake embeddings'''
@@ -204,8 +228,8 @@ def main():
             print(len(lake_image_list))
 
             if(selection_strag !="random"):
-                if(private_set):
-                    _, private_embeddings = getEmbeddings(model, "query_data_img/figure", ["figure"]);
+                # if(private_set):
+                #     _, private_embeddings = getEmbeddings(model, "query_data_img/figure", ["figure"])
                 subset_result = subset(lake_embeddings, query_embeddings, 2, lake_image_list, budget = selection_budget, metric = 'cosine', 
                                     stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag)
             else:

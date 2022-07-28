@@ -1,5 +1,5 @@
 
-from target_feature_selection import Targeted_Feature_Selection
+from feature_selection import Targeted_Feature_Selection
 from utils.submodlib import submod_results
 from utils.utils import *
 from utils.coco_util import *

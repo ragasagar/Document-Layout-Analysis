@@ -26,7 +26,7 @@ from utils.coco_util import *
 
 
 #initial weight and config path
-config_file_path = 'X101/X101.yaml'
+config_file_path = 'configs/coco/faster_rcnn_R_101_FPN_3x.yaml'
 # weights_paths = ["new_model_weights/model_final.pth",
 #     'random_model_weights/model_final.pth',
 #     'com_model_weights/model_final.pth',
@@ -35,12 +35,11 @@ config_file_path = 'X101/X101.yaml'
 # ]
 
 
-weights_paths = ['X101/model_final.pth', 'model_final.pth', 'model_weights/model_final_dynamic.pth',
-'model_weights/model_final.pth', 'model_weights/model_finall_dynamic_avg.pth'];
+weights_paths = ['final_model_testing/model_final.pth'];
 ## intial initializeation of the parameters
 register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", ".")
 # print(MetadataCatalog.get("train_data_dcoco"))
-register_coco_instances("docbank_seg_test",{}, "COCOValData.json", ".")
+register_coco_instances("docbank_seg_val",{}, "PASCAL_VOC/PASCAL_VOC/val_targeted.json", ".")
 final_data = []
 for weights_path in weights_paths:
     cfg = get_cfg();
@@ -53,22 +52,22 @@ for weights_path in weights_paths:
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8
 
     predictor = DefaultPredictor(cfg)
-    image = cv2.imread('train_data_img/1.tar_1401.0221.gz_revised_paper_19feb_2_ori.jpg')
+    image = cv2.imread('val_data_img/000024.jpg')
 
-    # print(predictor(image))
+    print(predictor(image))
 
-    evaluator = COCOEvaluator("docbank_seg_test", output_dir="./X101")
-    val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
-    result = inference_on_dataset(predictor.model, val_loader, evaluator)
-    print(find_missclassified_object(result))
-    for k , val  in  result.items():
-        temp = list(val.keys())
-        final_data.append(list(val.values()))
-        break;
-print(temp)
-csv = pd.DataFrame(final_data, columns=temp, index=weights_paths)
+#     evaluator = COCOEvaluator("docbank_seg_val", output_dir="final_new_weights")
+#     val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
+#     result = inference_on_dataset(predictor.model, val_loader, evaluator)
+#     print(find_missclassified_object(result))
+#     for k , val  in  result.items():
+#         temp = list(val.keys())
+#         final_data.append(list(val.values()))
+#         break;
+# print(temp)
+# csv = pd.DataFrame(final_data, columns=temp, index=weights_paths)
 
-csv.to_csv("test.csv")
+# csv.to_csv("test.csv")
 
 
 

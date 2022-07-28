@@ -47,10 +47,10 @@ def create_dir(dir_name):
         pass
 
 def store_file(source_img_dir,source_txt_dir,names, index, img_dir, txt_dir):
-    source_img_path = os.path.join(source_img_dir, "{}_ori.jpg".format(names[index]))
-    source_txt_path = os.path.join(source_txt_dir, "{}.txt".format(names[index]))
-    dest_img_path = os.path.join(img_dir, "{}_ori.jpg".format(names[index]))
-    dest_txt_path = os.path.join(txt_dir, "{}.txt".format(names[index]))
+    source_img_path = os.path.join(source_img_dir, "{}.jpg".format(names[index]))
+    source_txt_path = os.path.join(source_txt_dir, "{}.xml".format(names[index]))
+    dest_img_path = os.path.join(img_dir, "{}.jpg".format(names[index]))
+    dest_txt_path = os.path.join(txt_dir, "{}.xml".format(names[index]))
     try:
         shutil.copy(source_txt_path, dest_txt_path)
         shutil.copy(source_img_path, dest_img_path)
@@ -128,9 +128,9 @@ def store_file(source_img_dir,source_txt_dir,names, index, img_dir, txt_dir):
 
 
 
-def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 10000):
+def split_data(source_dirs, train_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 5000):
     source_img_dir, source_txt_dir = source_dirs
-    names = [f.replace(".txt","") for f in os.listdir(source_txt_dir)]
+    names = [f.replace(".xml","") for f in os.listdir(source_txt_dir)]
     print(len(names))
     np.random.seed(42)
 
@@ -147,7 +147,7 @@ def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_di
     lake_indices = list_index[test_index +1:data_size];
  
     train_img_dir, train_txt_dir = train_dirs
-    query_img_dir, query_txt_dir = query_dirs
+    
     lake_img_dir, lake_txt_dir = lake_dirs
     val_img_dir, val_txt_dir = val_dirs
     test_img_dir, test_txt_dir = test_dirs
@@ -160,8 +160,7 @@ def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_di
     remove_dir(val_txt_dir)
     remove_dir(test_img_dir)
     remove_dir(test_txt_dir)
-    remove_dir(query_img_dir)
-    remove_dir(query_txt_dir)
+
 
     create_dir(train_img_dir)
     create_dir(train_txt_dir)
@@ -171,21 +170,23 @@ def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_di
     create_dir(val_txt_dir)
     create_dir(test_img_dir)
     create_dir(test_txt_dir)
-    create_dir(query_img_dir)
-    create_dir(query_txt_dir)
     
     for index in train_indices:
-        if exists(os.path.join(source_txt_dir, "{}.txt".format(names[index]))):
+        if exists(os.path.join(source_txt_dir, "{}.xml".format(names[index]))):
             store_file(source_img_dir,source_txt_dir, names, index, train_img_dir, train_txt_dir)
     for index_l in lake_indices:
-        if exists(os.path.join(source_txt_dir, "{}.txt".format(names[index]))):
+        if exists(os.path.join(source_txt_dir, "{}.xml".format(names[index_l]))):
             store_file(source_img_dir,source_txt_dir, names, index_l, lake_img_dir, lake_txt_dir)
     for index_v in val_indices:
-        if exists(os.path.join(source_txt_dir, "{}.txt".format(names[index]))):
+        if exists(os.path.join(source_txt_dir, "{}.xml".format(names[index_v]))):
             store_file(source_img_dir,source_txt_dir, names, index_v, val_img_dir, val_txt_dir)
     for index_t in test_indices:
-        if exists(os.path.join(source_txt_dir, "{}.txt".format(names[index_t]))):
+        if exists(os.path.join(source_txt_dir, "{}.xml".format(names[index_t]))):
             store_file(source_img_dir,source_txt_dir, names, index_t, test_img_dir, test_txt_dir)
+
+    split_dataset(train_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/train_targeted.json")
+    split_dataset(lake_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/lake_targeted.json")
+    split_dataset(val_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/val_targeted.json")
 
 def coco_bbox_to_coordinates(bbox):
     out = bbox.copy().astype(float)
@@ -219,14 +220,16 @@ def conf_matrix_calc(labels, detections, n_classes, conf_thresh, iou_thresh):
 
 def create_query_dataset(categories):
     category_list = {
-            'abstract': 0, 'author': 1, 'caption': 2, 'equation': 3, 'figure': 4, 'footer': 5, 
-             'list': 6, 'paragraph': 7, 'reference': 8, 'section': 9, 'table': 10, 'title': 11, "date": 12}
+            "aeroplane":1, "bicycle":2, "bird":3, "boat":4, "bottle":5, "bus":6, "car":7, "cat":8,
+    "chair":9, "cow":10, "diningtable":11, "dog":12, "horse":13, "motorbike":14, "person":15,
+    "pottedplant":16, "sheep":17, "sofa":18, "train":19, "tvmonitor":20}
+
     for category in tqdm(categories):
         category_id = category_list[category];
-        query_data_dirs = ("DocBank_500K_ori_img", "DocBank_500K_txt")
+        query_data_dirs = ("voctest_06-nov-2007/VOCdevkit/VOC2007/JPEGImages", "pascal_voc/PASCAL_VOC/pascal_test2007.json")
         final_query_data_dirs = ("query_data_img/"+category, "query_data_txt_anno/"+category)
 
-        with open("COCOQueryData.json") as f:
+        with open("pascal_voc/PASCAL_VOC/pascal_test2007.json") as f:
             data = json.load(f);
             query_im = data['images']
             annotations = data['annotations']
@@ -243,29 +246,26 @@ def create_query_dataset(categories):
             print(image_names[:1])
             
             image_names = [i.split("/")[-1] for i in image_names]
-            image_names = [names.split("/")[-1].replace("_ori.jpg", "") for names in image_names]
+            image_names = [names.split("/")[-1].replace(".jpg", "") for names in image_names]
             names = list(set(image_names));
             if len(image_names) > 5 :
                 names = image_names[:5];
 
             for index in range(len(names)):
                 # Source path
-                source_img = os.path.join(query_data_dirs[0], "{}_ori.jpg".format(names[index]))
-                print(source_img)
+                source_img = os.path.join(query_data_dirs[0], "{}.jpg".format(names[index]))
                 # Destination path
-                source_txt = os.path.join(query_data_dirs[1], "{}.txt".format(names[index]))
+                # source_txt = os.path.join(query_data_dirs[1], "{}.txt".format(names[index]))
 
-                destination_img = os.path.join(final_query_data_dirs[0], "{}_ori.jpg".format(names[index]))
+                destination_img = os.path.join(final_query_data_dirs[0], "{}.jpg".format(names[index]))
                 # Destination path
-                destination_txt = os.path.join(final_query_data_dirs[1], "{}.txt".format(names[index]))
+                # destination_txt = os.path.join(final_query_data_dirs[1], "{}.txt".format(names[index]))
                 
-                if not os.path.exists(query_data_dirs[0]) or not os.path.exists(query_data_dirs[1]):
-                    os.mkdir(query_data_dirs[0])
-                    os.mkdir(query_data_dirs[1])
+                if not os.path.exists(final_query_data_dirs[0]):
+                    os.mkdir(final_query_data_dirs[0])
                 
                 try:
                     shutil.copy(source_img, destination_img)
-                    shutil.copy(source_txt, destination_txt)
                     # print("File copied successfully.")
                 except shutil.SameFileError:
                     print("Source and destination represents the same file.")
@@ -277,22 +277,6 @@ def create_query_dataset(categories):
                 # For other errors
                 except:
                     print("Error occurred while copying file.")
-
-
-                # # removing the data from the lake data
-                # try:
-                #     os.remove(os.path.join(query_data_dirs[0], "{}_ori.jpg".format(names[index])))
-                #     os.remove(os.path.join(query_data_dirs[1], "{}.txt".format(names[index])))
-                # except:
-                #     pass
-                    
-                
-
-            # query_im = [names.split("/")[-1].replace("_ori.jpg", "") for names in query_im]
-            # print(query_im[0:5])
-            # query_im = [i["file_name"].split("/")[-1] for i in query_im]
-            # query_im = [names.split("/")[-1].replace("_ori.jpg", "") for names in query_im]
-            # print(query_im[0:5])
 
 def find_missclassified_object(result):
     ignore_class = ['AP', 'AP50', 'AP75', 'APs', 'APm', 'APl']
@@ -315,3 +299,67 @@ def get_test_score(result):
         for key, value in val.items():
             if(key == "AP"):
                 return value;
+
+
+def split_dataset(img_data_dir, img_anno_file, dest_anno_file):
+    with open(img_anno_file, mode="r") as f:
+        dataset = json.load(f)
+
+    data_images = dataset['images']
+    list_images = os.listdir(img_data_dir)
+    random.shuffle(list_images)
+    list_images = list_images[:10000];
+    images = list(filter(lambda x: x['file_name'] in list_images, data_images))
+    print("filter completed")
+    annotations = dataset['annotations']
+    categories = dataset["categories"]
+
+    image_ids = [id['id'] for id in images]
+
+    create_labels(image_ids, images, annotations, categories, dest_anno_file)
+    # print("train_label_created")
+
+def aug_train_subset(subset_result, train_data_json, lake_data_json, budget):
+    with open(lake_data_json, mode="r") as f:
+        lake_dataset = json.load(f)
+    with open(train_data_json, mode="r") as f:
+        train_dataset = json.load(f)
+
+    categories = lake_dataset['categories']
+    image_list = list(filter(lambda x: x['file_name'] in subset_result, lake_dataset['images']))
+    image_id = [image['id'] for image in image_list]
+    annotations_shift = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))
+
+    train_annotations = train_dataset['annotations'];
+    train_image_list = train_dataset['images'];
+
+    # appending the images to train images
+    train_image_list += image_list;
+    train_annotations += annotations_shift;
+
+    #removing the images lake dataset.
+    final_lake_image_list = list(filter(lambda x: x['file_name'] not in subset_result, lake_dataset['images']))
+    image_id = [image['id'] for image in image_list]
+    final_lake_annotations = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))
+
+    create_labels(train_image_list, train_annotations, categories, train_data_json)
+    create_labels(final_lake_image_list, final_lake_annotations, categories, lake_data_json)
+
+
+def create_labels(indices, images, annotations, categories, filename):
+    labels = {}
+    image_list = list(filter(lambda x: x['id'] in indices, images))
+    annotation_list = list(filter(lambda x: x['image_id'] in indices, annotations))
+    labels['images'] = image_list
+    labels['annotations'] = annotation_list
+    labels['categories'] = categories
+
+    with open(filename, "w") as f:
+        json.dump(labels, f)
+
+# create_query_dataset([
+#     "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat",
+#     "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person",
+#     "pottedplant", "sheep", "sofa", "train", "tvmonitor"
+# ])
+

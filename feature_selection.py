@@ -146,10 +146,14 @@ class ImageModel:
 
 
         OLD_MAPPING = {
-            "0":'abstract', "1": 'author', "2": 'caption', "3": 'equation', "4": 'figure', "5": 'footer', 
-              "6":'list', "7": 'paragraph', "8": 'reference', "9": 'section', "10": 'table', "11": 'title', "12": "date"}
+            "1":"aeroplane", "2":"bicycle", "3":"bird", "4":"boat", "5":"bottle", "6":"bus", "7":"car", "8":"cat",
+            "9":"chair", "10":"cow", "11":"diningtable", "12":"dog", "13":"horse", "14":"motorbike", "15":"person", 
+            "16":"pottedplant", "17":"sheep", "18":"sofa", "19":"train", "20":"tvmonitor"}
 
-        CLASSES = ['paragraph', 'section', 'caption', 'equation', 'figure', 'date', 'abstract', 'author', 'title', 'table', 'list', 'reference', 'footer']          
+        CLASSES = [
+            "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat",
+            "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", 
+            "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
         if is_query==True:
             final_im_list = None
         else:

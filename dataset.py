@@ -21,11 +21,7 @@ from utils.utils import *
 from utils.coco_util import *
 
 def create_dataset():
-    img_path = 'DocBank_500K_ori_img'
-    txt_anno_path = 'DocBank_500K_txt'
-    arrange_data("DocBank/DocBank_samples/DocBank_samples", img_path, txt_anno_path)
-
-    source_dirs = ("DocBank_500K_ori_img", "DocBank_500K_txt")
+    source_dirs = ("VOCtrainval_06-Nov-2007/VOCdevkit/VOC2007/JPEGImages", "VOCtrainval_06-Nov-2007/VOCdevkit/VOC2007/Annotations")
     # source_dirs = ("img", "txt")
     query_data_dirs = ("new_query_data_img", "new_query_data_txt_anno")
     train_data_dirs = ("train_data_img", "train_data_txt_anno")
@@ -40,11 +36,11 @@ def create_dataset():
     
     split_data(source_dirs, 
             train_dirs= train_data_dirs, 
-            query_dirs=query_data_dirs,
             lake_dirs= lake_data_dirs,
             test_dirs=test_data_dirs, 
             val_dirs=val_data_dirs, 
-            split_cfg=split_cfg
+            split_cfg=split_cfg,
+            data_size= 4952
     )
 
 
@@ -71,6 +67,3 @@ def create_dataset():
     # lake_data_coco = COCOData("COCOLakeData.json",lake_data_examples)
     # lake_data_coco.convert_to_coco()
     # lake_data_coco.save_coco_dataset()
-
-
-# create_dataset()
