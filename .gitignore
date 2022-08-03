@@ -61,3 +61,14 @@ train-0.tar.gz
 .vscode/
 final_model_testing/
 publaynet/
+PASCALVOC2007.zip
+PASCAL_VOC/
+VOCtest_06-Nov-2007/
+VOCtrainval_06-Nov-2007/
+coco_eval/
+# configs/coco/
+# create_dataset.py
+# feature_selection.py
+pascal_voc/
+voctest_06-nov-2007/
+voctrainval_06-nov-2007/

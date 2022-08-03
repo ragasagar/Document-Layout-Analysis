@@ -35,12 +35,11 @@ config_file_path = 'X101/X101.yaml'
 # ]
 
 
-weights_paths = ['X101/model_final.pth', 'model_final.pth', 'model_weights/model_final_dynamic.pth',
-'model_weights/model_final.pth', 'model_weights/model_finall_dynamic_avg.pth'];
+weights_paths = ['final_model_testing/model_final.pth'];
 ## intial initializeation of the parameters
 register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", ".")
 # print(MetadataCatalog.get("train_data_dcoco"))
-register_coco_instances("docbank_seg_test",{}, "COCOValData.json", ".")
+register_coco_instances("docbank_seg_test",{}, "COCOTestData.json", ".")
 final_data = []
 for weights_path in weights_paths:
     cfg = get_cfg();

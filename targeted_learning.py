@@ -3,6 +3,7 @@
 from genericpath import exists
 from re import T
 from tkinter import Image
+from typing import final
 from dataset import create_dataset
 import detectron2
 from detectron2.utils.logger import setup_logger
@@ -16,7 +17,7 @@ setup_logger()
 import numpy as np
 import os, json, cv2, random, shutil
 import torch
-
+import pandas as pd
 # import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor, DefaultTrainer
@@ -163,94 +164,136 @@ def main():
     final_val_score = [];
     test_score = 0;
     iteration = 0;
-    while(test_score < 90 and iteration < number_of_rounds):    
-        if(iteration==0):
-            print('Initial phase  \n Loading trained model')        
-            if(not os.path.exists(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))):
-                model = create_model(cfg, "train")
+    result = {}
+    val_result = {}
+    try:
+        while(test_score < 90 and iteration < number_of_rounds):    
+            if(iteration==0):
+                print('Initial phase  \n Loading trained model')        
+                if(not os.path.exists(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))):
+                    model = create_model(cfg, "train")
+                    model.train()            
+                ## evaluating the model perfromance
+                cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+
+                model = create_model(cfg, "test")
+
+                evaluator = COCOEvaluator("docbank_seg_val", output_dir=output_dir)
+                val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
+                val_result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
+
+                evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
+                val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
+                result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
+            else:
+                print("training start iteration:", iteration)
+                
+                cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+                model = create_model(cfg,"test")
+
+
+                #finding the most misclassified objects from the models.
+                query_path, category = find_missclassified_object(result);
+                print(query_path,category);
+                # finding the embedding of the boxes.
+                if(iteration>5):
+                    _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", query_path, category)
+                else:
+                    _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", 'query_data_img/equation', ['equation'])
+                print(len(query_embeddings))
+
+                '''Lake embeddings'''
+                # print(len(lake_embeddings))
+                print(len(lake_image_list))
+
+                if(selection_strag !="random"):
+                    if(private_set):
+                        _, private_embeddings = getEmbeddings(model, "query_data_img/figure", ["figure"]);
+                    subset_result = subset(lake_embeddings, query_embeddings, 2, lake_image_list, budget = selection_budget, metric = 'cosine', 
+                                        stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag)
+                else:
+                    lake_image_list = os.listdir(lake_data_dirs[0])
+                    subset_result = Random_wrapper(lake_image_list, 10)
+                
+                budget-=selection_budget;
+                if(budget>0):
+                    change_dir(subset_result, train_data_dirs, lake_data_dirs, budget)
+                # Adding the data to the query image list
+                lake_image_list = os.listdir("lake_data_img")
+                lake_image_list = [os.path.join("lake_data_img",x) for x in lake_image_list]
+                
+                # Creating new embedding for the new dataset.
+                train_image_list = os.listdir("train_data_img")
+                train_image_list = [os.path.join("train_data_img",x) for x in train_image_list]
+
+                remove_dataset("docbank_seg_train")
+                register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", ".")
+                
+                model = create_model(cfg)
                 model.train()
-            
-            ## evaluating the model perfromance
-            cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
 
-            model = create_model(cfg, "test")
+                ## evaluating the model perfromance
+                cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+                
+                model = create_model(cfg, "test")
+                #evaluating val model.
+                evaluator = COCOEvaluator("docbank_seg_val", output_dir=output_dir)
+                val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
+                val_result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
 
-            evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
-            val_result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
-
-            evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
-            result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
-        else:
-            print("training start iteration:", iteration)
-            
-            cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
-            model = create_model(cfg,"test")
+                #evaluationg test models
+                evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
+                val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
+                result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
 
 
-            #finding the most misclassified objects from the models.
-            query_path, category = find_missclassified_object(result);
-            print(query_path,category);
-            # finding the embedding of the boxes.
-            if(iteration>5):
-                _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", query_path, category)
-            else:
-                _, query_embeddings, lake_image_list, lake_embeddings= getEmbeddings(model, "lake_data_img", 'query_data_img/equation', ['equation'])
-            print(len(query_embeddings))
-
-            '''Lake embeddings'''
-            # print(len(lake_embeddings))
-            print(len(lake_image_list))
-
-            if(selection_strag !="random"):
-                if(private_set):
-                    _, private_embeddings = getEmbeddings(model, "query_data_img/figure", ["figure"]);
-                subset_result = subset(lake_embeddings, query_embeddings, 2, lake_image_list, budget = selection_budget, metric = 'cosine', 
-                                    stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag)
-            else:
-                lake_image_list = os.listdir(lake_data_dirs[0])
-                subset_result = Random_wrapper(lake_image_list, 10)
-            
-            budget-=selection_budget;
-            if(budget>0):
-                change_dir(subset_result, train_data_dirs, lake_data_dirs, budget)
-            # Adding the data to the query image list
-            lake_image_list = os.listdir("lake_data_img")
-            lake_image_list = [os.path.join("lake_data_img",x) for x in lake_image_list]
-            
-            # Creating new embedding for the new dataset.
-            train_image_list = os.listdir("train_data_img")
-            train_image_list = [os.path.join("train_data_img",x) for x in train_image_list]
-
-            remove_dataset("docbank_seg_train")
-            register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", "train_data_img")
-            
-            model = create_model(cfg)
-            model.train()
-
-            ## evaluating the model perfromance
-            cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
-            
-            model = create_model(cfg, "test")
-            #evaluating val model.
-            evaluator = COCOEvaluator("docbank_seg_val", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
-            val_result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
-
-            #evaluationg test models
-            evaluator = COCOEvaluator("docbank_seg_test", output_dir=output_dir)
-            val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
-            result = inference_on_dataset(model.predictor.model, val_loader, evaluator)
-
-
-            #putting each round val score and test cores.
-            final_test_score.append(result)
-            final_val_score.append(val_result)
-            test_score = get_test_score(result)
+                #putting each round val score and test cores.
+                final_test_score.append(result)
+                final_val_score.append (val_result)
+                test_score = get_test_score(result)
+                final_test_score.append(result)
+                final_val_score.append (val_result)
+                final_data=[];
+                temp = []
+                for i in final_val_score:
+                    print(i);
+                    for k , val  in  i.items():
+                        temp = list(val.keys())
+                        final_data.append(list(val.values()))
+                csv = pd.DataFrame(final_data, columns=temp)
+                csv.to_csv("val_scores.csv")
+                final_data=[];
+                for i in final_test_score:
+                    print(i)
+                    for k , val  in  i.items():
+                        temp = list(val.keys())
+                        final_data.append(list(val.values()))
+                csv = pd.DataFrame(final_data, columns=temp)
+                csv.to_csv("test_scores.csv")
+            iteration+=1;
+    except:
+        print("Exeception occur while training")
+    finally:
+        final_test_score.append(result)
+        final_val_score.append (val_result)
+        final_data=[];
+        temp = []
+        for i in final_val_score:
+            print(i);
+            for k , val  in  i.items():
+                temp = list(val.keys())
+                final_data.append(list(val.values()))
+        csv = pd.DataFrame(final_data, columns=temp)
+        csv.to_csv("val_scores.csv")
+        final_data=[];
+        for i in final_test_score:
+            print(i)
+            for k , val  in  i.items():
+                temp = list(val.keys())
+                final_data.append(list(val.values()))
+        csv = pd.DataFrame(final_data, columns=temp)
+        csv.to_csv("test_scores.csv") 
         
-        #increasing iteration.
-        iteration+=1;
             
     print("completed result");
 

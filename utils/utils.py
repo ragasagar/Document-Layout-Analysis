@@ -128,7 +128,7 @@ def store_file(source_img_dir,source_txt_dir,names, index, img_dir, txt_dir):
 
 
 
-def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 10000):
+def split_data(source_dirs, train_dirs, query_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 30000):
     source_img_dir, source_txt_dir = source_dirs
     names = [f.replace(".txt","") for f in os.listdir(source_txt_dir)]
     print(len(names))

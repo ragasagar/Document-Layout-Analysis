@@ -33,7 +33,7 @@ def create_dataset():
     test_data_dirs = ("test_data_img", "test_data_txt_anno")
     val_data_dirs = ("val_data_img", "val_data_txt_anno")
     split_cfg = {
-        "train_ratio":0.1,
+        "train_ratio":0.4,
         "val_ratio":0.05,
         "test_ratio":0.05
     }
