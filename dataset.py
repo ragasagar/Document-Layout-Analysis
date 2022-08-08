@@ -40,7 +40,7 @@ def create_dataset():
             test_dirs=test_data_dirs, 
             val_dirs=val_data_dirs, 
             split_cfg=split_cfg,
-            data_size= 4952
+            data_size= 5011
     )
 
 

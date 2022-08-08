@@ -146,9 +146,9 @@ class ImageModel:
 
 
         OLD_MAPPING = {
-            "1":"aeroplane", "2":"bicycle", "3":"bird", "4":"boat", "5":"bottle", "6":"bus", "7":"car", "8":"cat",
-            "9":"chair", "10":"cow", "11":"diningtable", "12":"dog", "13":"horse", "14":"motorbike", "15":"person", 
-            "16":"pottedplant", "17":"sheep", "18":"sofa", "19":"train", "20":"tvmonitor"}
+            "0":"aeroplane", "1":"bicycle", "2":"bird", "3":"boat", "4":"bottle", "5":"bus", "6":"car", "7":"cat",
+            "8":"chair", "9":"cow", "10":"diningtable", "11":"dog", "12":"horse", "13":"motorbike", "14":"person", 
+            "15":"pottedplant", "16":"sheep", "17":"sofa", "18":"train", "19":"tvmonitor"}
 
         CLASSES = [
             "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat",
@@ -177,14 +177,13 @@ class ImageModel:
                     pred_classes = instances[0].pred_classes.cpu().numpy().tolist()
                     pred_scores = instances[0].scores.cpu().numpy().tolist()
 
-                    new_pred_class = []
-                    for pred in pred_classes:
-                        if pred!=0:
-                            new_pred_class.append(pred)
+                    # new_pred_class = []
+                    # for pred in pred_classes:
+                    #     new_pred_class.append(pred)
 
-                    pred_classes = new_pred_class
-                    if 0 in pred_classes:
-                        raise Exception("Lol")
+                    # pred_classes = new_pred_class
+                    # if 0 in pred_classes:
+                    #     raise Exception("Lol")
                     pred_boxes = instances[0].pred_boxes.tensor.cpu().numpy()
 
                     box_features = [features[f] for f in self.predictor.model.roi_heads.in_features]
@@ -198,8 +197,6 @@ class ImageModel:
                     if sel_strategy == 'area':
                         #Max area bounding box
                         for i,cl in enumerate(pred_classes):
-                            if cl==0:
-                                continue
                             cl = OLD_MAPPING[str(cl)]
                             if is_query or cl in targeted_classes:
                                 # print("here!")
@@ -227,8 +224,6 @@ class ImageModel:
                         box_features_weights=[];
                         box_score=[]
                         for i,cl in enumerate(pred_classes):
-                            if cl==0:
-                                continue
                             cl = OLD_MAPPING[str(cl)]
                             if cl in targeted_classes:
                                 box_features_weights.append(box_features_from_head[i,:].cpu().numpy())
@@ -250,8 +245,6 @@ class ImageModel:
                         box_features_weights=[];
                         box_score=[]
                         for i,cl in enumerate(pred_classes):
-                            if cl==0:
-                                continue
                             cl = OLD_MAPPING[str(cl)]
                             if cl in targeted_classes:
                                 box_features_weights.append(box_features_from_head[i,:].cpu().numpy())
