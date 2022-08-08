@@ -3,6 +3,7 @@ from __future__ import annotations
 from tkinter import image_names
 from tokenize import String
 from unicodedata import category
+from matplotlib import image
 import numpy as np
 import os, json, cv2, random, shutil
 import torch
@@ -129,8 +130,14 @@ def store_file(source_img_dir,source_txt_dir,names, index, img_dir, txt_dir):
 
 
 def split_data(source_dirs, train_dirs, lake_dirs, test_dirs, val_dirs, split_cfg, data_size = 5000):
+    source_json = "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json"
     source_img_dir, source_txt_dir = source_dirs
-    names = [f.replace(".xml","") for f in os.listdir(source_txt_dir)]
+    with open(source_json, mode="r") as f:
+        dataset = json.load(f)
+
+    data_images = [x['file_name'] for x in dataset['images']]
+    images = list(filter(lambda x: x in data_images, os.listdir(source_img_dir)))
+    names = [f.replace(".jpg","") for f in images]
     print(len(names))
     np.random.seed(42)
 
@@ -184,9 +191,10 @@ def split_data(source_dirs, train_dirs, lake_dirs, test_dirs, val_dirs, split_cf
         if exists(os.path.join(source_txt_dir, "{}.xml".format(names[index_t]))):
             store_file(source_img_dir,source_txt_dir, names, index_t, test_img_dir, test_txt_dir)
 
-    split_dataset(train_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/train_targeted.json")
-    split_dataset(lake_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/lake_targeted.json")
-    split_dataset(val_img_dir, "PASCAL_VOC/PASCAL_VOC/pascal_train2007.json" ,"PASCAL_VOC/PASCAL_VOC/val_targeted.json")
+    split_dataset(train_img_dir, source_json ,"PASCAL_VOC/PASCAL_VOC/train_targeted.json")
+    split_dataset(lake_img_dir, source_json ,"PASCAL_VOC/PASCAL_VOC/lake_targeted.json")
+    split_dataset(val_img_dir, source_json ,"PASCAL_VOC/PASCAL_VOC/val_targeted.json")
+    split_dataset(test_img_dir, source_json ,"PASCAL_VOC/PASCAL_VOC/test_targeted.json")
 
 def coco_bbox_to_coordinates(bbox):
     out = bbox.copy().astype(float)
@@ -308,7 +316,6 @@ def split_dataset(img_data_dir, img_anno_file, dest_anno_file):
     data_images = dataset['images']
     list_images = os.listdir(img_data_dir)
     random.shuffle(list_images)
-    list_images = list_images[:10000];
     images = list(filter(lambda x: x['file_name'] in list_images, data_images))
     print("filter completed")
     annotations = dataset['annotations']
@@ -319,7 +326,7 @@ def split_dataset(img_data_dir, img_anno_file, dest_anno_file):
     create_labels(image_ids, images, annotations, categories, dest_anno_file)
     # print("train_label_created")
 
-def aug_train_subset(subset_result, train_data_json, lake_data_json, budget):
+def aug_train_subset(subset_result, train_data_json, lake_data_json, budget, src_dir, dest_dir):
     with open(lake_data_json, mode="r") as f:
         lake_dataset = json.load(f)
     with open(train_data_json, mode="r") as f:
@@ -342,9 +349,60 @@ def aug_train_subset(subset_result, train_data_json, lake_data_json, budget):
     image_id = [image['id'] for image in image_list]
     final_lake_annotations = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))
 
-    create_labels(train_image_list, train_annotations, categories, train_data_json)
-    create_labels(final_lake_image_list, final_lake_annotations, categories, lake_data_json)
+    #moving data from lake set to train set.
+    change_dir(subset_result, src_dir, dest_dir)
 
+    #changing the coco-file for annotations
+    create_labels_update(train_image_list, train_annotations, categories, train_data_json)
+    create_labels_update(final_lake_image_list, final_lake_annotations, categories, lake_data_json)
+
+def create_labels_update(images, annotations, categories, filename):
+    labels = {}
+    labels['images'] = images
+    labels['annotations'] = annotations
+    labels['categories'] = categories
+
+    with open(filename, "w") as f:
+        json.dump(labels, f)
+
+def change_dir(image_results, src_dir, dest_dir):
+    names = [names.split("/")[-1].replace(".jpg", "") for names in image_results]
+    for index in range(len(names)):
+        # Source path
+        source_img = os.path.join(src_dir[0], "{}.jpg".format(names[index]))
+        # Destination path
+        # source_txt = os.path.join(src_dir[1], "{}.xml".format(names[index]))
+
+        destination_img = os.path.join(dest_dir[0], "{}.jpg".format(names[index]))
+        # Destination path
+        # destination_txt = os.path.join(dest_dir[1], "{}.xml".format(names[index]))
+        
+        if not os.path.exists(dest_dir[0]) or not os.path.exists(dest_dir[1]):
+            os.mkdir(dest_dir[0])
+            os.mkdir(dest_dir[1])
+        
+        try:
+            shutil.copy(source_img, destination_img)
+            # shutil.copy(source_txt, destination_txt)
+            # print("File copied successfully.")
+        except shutil.SameFileError:
+            print("Source and destination represents the same file.")
+        
+        # If there is any permission issue
+        except PermissionError:
+            print("Permission denied.")
+        
+        # For other errors
+        except:
+            print("Error occurred while copying file.")
+
+
+        # removing the data from the lake data
+        try:
+            os.remove(os.path.join(src_dir[0], "{}.jpg".format(names[index])))
+            # os.remove(os.path.join(src_dir[1], "{}.xml".format(names[index])))
+        except:
+            pass
 
 def create_labels(indices, images, annotations, categories, filename):
     labels = {}

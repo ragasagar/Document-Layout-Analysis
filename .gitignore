@@ -61,3 +61,17 @@ train-0.tar.gz
 .vscode/
 final_model_testing/
 publaynet/
+PASCALVOC2007.zip
+PASCAL_VOC/
+VOCtest_06-Nov-2007/
+VOCtrainval_06-Nov-2007/
+coco-weights/
+coco_eval/
+dynamic_weight_change/
+final_new_weights/
+pascal_voc/
+test1_final_model_testing/
+test_score.csv
+val_scores.csv
+voctest_06-nov-2007/
+voctrainval_06-nov-2007/

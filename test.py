@@ -35,30 +35,30 @@ config_file_path = 'configs/coco/faster_rcnn_R_101_FPN_3x.yaml'
 # ]
 
 
-weights_paths = ['final_model_testing/model_final.pth'];
+weights_paths = ['dynamic_weight_change/model_final.pth'];
 ## intial initializeation of the parameters
 register_coco_instances("docbank_seg_train",{}, "COCOTrainData.json", ".")
 # print(MetadataCatalog.get("train_data_dcoco"))
-register_coco_instances("docbank_seg_val",{}, "PASCAL_VOC/PASCAL_VOC/val_targeted.json", ".")
+register_coco_instances("docbank_seg_test",{}, "PASCAL_VOC/PASCAL_VOC/test_targeted.json", "test_data_img")
 final_data = []
 for weights_path in weights_paths:
     cfg = get_cfg();
     cfg.DATASETS.TRAIN = ("docbank_seg_train",)
     cfg.DATASETS.TEST = ("docbank_seg_test",)
 
-    cfg.merge_from_file(config_file_path)
+    cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
     # cfg.MODEL.DEVICE = "cpu"
     cfg.MODEL.WEIGHTS = weights_path
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8
 
     predictor = DefaultPredictor(cfg)
-    image = cv2.imread('val_data_img/000024.jpg')
+    # image = cv2.imread('val_data_img/000024.jpg')
 
-    print(predictor(image))
+    # print(predictor(image))
 
-#     evaluator = COCOEvaluator("docbank_seg_val", output_dir="final_new_weights")
-#     val_loader = build_detection_test_loader(cfg, "docbank_seg_val")
-#     result = inference_on_dataset(predictor.model, val_loader, evaluator)
+    evaluator = COCOEvaluator("docbank_seg_test", output_dir="final_new_weights")
+    val_loader = build_detection_test_loader(cfg, "docbank_seg_test")
+    result = inference_on_dataset(predictor.model, val_loader, evaluator)
 #     print(find_missclassified_object(result))
 #     for k , val  in  result.items():
 #         temp = list(val.keys())
