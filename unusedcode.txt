@@ -1,0 +1,38 @@
+register_coco_instances("seg_test",{}, "../publaynet/test_targeted.json", "../publaynet/test_data_img")
+
+#init detection model
+
+results = OrderedDict()
+
+for dataset_name in cfg.DATASETS.TEST:
+    print('evaluation on %s' % dataset_name)
+    data_loader = build_detection_test_loader(cfg, dataset_name)
+    evaluator = COCOEvaluator(dataset_name, output_dir=output_dir)
+    results_i = inference_on_dataset(model, data_loader, evaluator)
+    if comm.is_main_process():
+            logger.info("Evaluation results for {} in csv format:".format(dataset_name))
+            print_csv_format(results_i)
+
+d1
+Class figure, MAP 0.9056695992179863
+Class table, MAP 0.8636831275720164
+Class text, MAP 0.9418958742632613
+Class list, MAP 0.27355919003115264
+Class title, MAP 0.7605682605682605
+MMAP 0.7490752103305354
+
+d2
+Class table, MAP 0.8595679012345677
+Class figure, MAP 0.897605083088954
+Class text, MAP 0.9424115913555993
+Class list, MAP 0.27940031152647976
+Class title, MAP 0.7592169092169092
+MMAP 0.747640359284502
+
+cosine
+Class text, MAP 0.9423051735428947
+Class title, MAP 0.7556826056826056
+Class figure, MAP 0.9134897360703812
+Class table, MAP 0.8636831275720163
+Class list, MAP 0.28329439252336447
+MMAP 0.7516910070782524
