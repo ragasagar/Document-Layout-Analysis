@@ -59,7 +59,11 @@ def crop_object(image, box, ground_truth=False):
     x_center = (x_top_left + x_bottom_right) / 2
     y_center = (y_top_left + y_bottom_right) / 2
 
-    crop_img = image.crop((int(x_top_left), int(y_top_left), int(x_bottom_right), int(y_bottom_right)))
+    try:
+        crop_img = image.crop((int(x_top_left), int(y_top_left), int(x_bottom_right), int(y_bottom_right)))
+    except Exception as e:
+        pass
+
     return crop_img
 
 def do_evaluate(cfg, model, output_path):
@@ -82,6 +86,10 @@ def crop_images_classwise(model:DefaultPredictor, src_path, dest_path):
     if not os.path.exists(dest_path+'/obj_images'):
         os.makedirs(dest_path+'/obj_images')
     obj_im_dir = dest_path+'/obj_images'
+    # MAPPING = {
+    #         "0":"aeroplane", "1":"bicycle", "2":"bird", "3":"boat", "4":"bottle", "5":"bus", "6":"car", "7":"cat",
+    #         "8":"chair", "9":"cow", "10":"diningtable", "11":"dog", "12":"horse", "13":"motorbike", "14":"person", 
+    #         "15":"pottedplant", "16":"sheep", "17":"sofa", "18":"train", "19":"tvmonitor"}
     MAPPING = {"0":"text", "1":"title","2":"list","3":"table","4":"figure"}
     no_of_objects=0
     for d in tqdm(os.listdir(src_path)):
@@ -100,8 +108,12 @@ def crop_images_classwise(model:DefaultPredictor, src_path, dest_path):
             no_of_objects+=1
             box = box.detach().cpu().numpy()
         
-            crop_img = crop_object(img, box)      
-            crop_img.save(os.path.join(obj_im_dir,MAPPING[str(classes[idx])],os.path.split(os.path.join(src_path, d))[1].replace(".jpg","")+"_"+str(idx)+".jpg"))
+            
+            crop_img = crop_object(img, box) 
+            try:
+                crop_img.save(os.path.join(obj_im_dir,MAPPING[str(classes[idx])],os.path.split(os.path.join(src_path, d))[1].replace(".jpg","")+"_"+str(idx)+".jpg"))
+            except Exception as e:
+                print(e)
 
     print("Number of objects: "+str(no_of_objects))
 
@@ -110,6 +122,10 @@ def crop_images_classwise_ground_truth(train_json_path, src_path, dest_path, cat
     if not os.path.exists(dest_path+'/obj_images'):
         os.makedirs(dest_path+'/obj_images')
     obj_im_dir = dest_path+'/obj_images'
+    # MAPPING = {
+    #         "aeroplane":1, "bicycle":2, "bird":3, "boat":4, "bottle":5, "bus":6, "car":7, "cat":8,
+    # "chair":9, "cow":10, "diningtable":11, "dog":12, "horse":13, "motorbike":14, "person":15,
+    # "pottedplant":16, "sheep":17, "sofa":18, "train":19, "tvmonitor":20, "null":21}
     MAPPING = {"text":1, "title": 2,"list":3,"table":4,"figure":5}
     no_of_objects=0
     with open(train_json_path) as f:

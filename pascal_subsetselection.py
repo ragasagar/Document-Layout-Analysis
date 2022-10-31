@@ -7,19 +7,21 @@ from CBIR.src.DB import Database
 from CBIR.src.evaluate import infer_subset
 from CBIR.src.resnet import ResNetFeat
 from utils.detectron_util import create_model, crop_images_classwise, crop_images_classwise_ground_truth, do_evaluate, remove_dataset
+from utils.pascal_util import create_pascal_db
 from utils.submodlib_util import Margin_Sampling, Random_wrapper
 import pandas as pd
+from detectron2 import model_zoo
 from utils.util import aug_train_subset, create_dir, create_new_query, find_missclassified_object, get_category_details, get_lakeset_images, get_original_images_path, remove_dir
 
 import torch
 
-torch.cuda.set_device(0)
+torch.cuda.set_device(1)
 parser = default_argument_parser()
 
-parser.add_argument("--output_path",          default="flmi_test3", help="Output_path")
-parser.add_argument("--strategy", default="cmi", help="subset selection strategy")
-parser.add_argument("--total_budget",      default="500", type=int,  help="Total AL budget")
-parser.add_argument("--budget",   default="10", type=int, help="selection budget")
+parser.add_argument("--output_path",          default="fl1mi_test", help="Output_path")
+parser.add_argument("--strategy", default="fl1mi", help="subset selection strategy")
+parser.add_argument("--total_budget",      default="200", type=int,  help="Total AL budget")
+parser.add_argument("--budget",   default="20", type=int, help="selection budget")
 parser.add_argument("--lake_size",   default="100", type=int, help="selection budget")
 parser.add_argument("--train_size",   default="100", type=int, help="selection budget")
 parser.add_argument("--category",   default="list", type=str, help="Targeted class")
@@ -32,22 +34,10 @@ private_query_path = 'query_data_img/'+arg.private_category
 category = [arg.category];
 private_category = [arg.private_category]
 
-dataset_dir = ("../publaynet/publaynet/train5",
-               "../publaynet/publaynet/train.json")
-init_train_dataset_dir = ("../publaynet/intial_train_img/train_data_img",
-                          "../publaynet/intial_train_img/train_targeted.json")
-train_data_dirs = ("publaynet/train_data_img",
-                   "publaynet/train_targeted.json")
-# val_data_dirs = ("publaynet/train_data_img",
-#                    "publaynet/train_targeted.json")
-# test_data_dirs = ("publaynet/train_data_img",
-#                    "publaynet/train_targeted.json")
-lake_data_dirs = ("publaynet/lake_data_img",
-                  "publaynet/lake_targeted.json")
-test_data_dirs = ("../publaynet/test_data_img",
-                  "../publaynet/test_targeted.json")
-val_data_dirs = ("../publaynet/val_data_img",
-                 "../publaynet/val_targeted.json")
+train_data_dirs = ("pascal2007/train_data_img", "pascal2007/train_targeted.json")
+lake_data_dirs = ("pascal2007/lake_data_img", "pascal2007/lake_targeted.json")
+test_data_dirs = ("pascal2007/test_data_img", "pascal2007/test_targeted.json")
+val_data_dirs = ("pascal2007/val_data_img", "pascal2007/val_targeted.json")
 
 train_path = 'model_result'
 training_name = arg.output_path
@@ -63,36 +53,30 @@ prediction_score_threshold = 0.7
 selection_strag = arg.strategy
 selection_budget = arg.budget
 budget = arg.total_budget
+
 cfg = get_cfg()
-cfg.merge_from_file(config_file_path)
+cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
 cfg.DATASETS.TRAIN = ("initial_set",)
-cfg.DATASETS.TEST = ('test_set', 'val_set')
-cfg.DATALOADER.NUM_WORKERS = 4
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 5
+cfg.DATASETS.TEST = ("val_set","test_set")
+cfg.DATALOADER.NUM_WORKERS = 6
+cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml")  # Let training initialize from model zoo
+cfg.SOLVER.IMS_PER_BATCH = 4
 cfg.SOLVER.BASE_LR = 0.00025
 cfg.SOLVER.WARMUP_ITERS = 1000
-cfg.SOLVER.MAX_ITER = 6000
-cfg.SOLVER.IMS_PER_BATCH = 6
-cfg.MODEL.RPN.NMS_THRESH = 0.6
-cfg.TEST.EVAL_PERIOD = 1000
+cfg.SOLVER.MAX_ITER = 2500 #adjust up if val mAP is still rising, adjust down if overfit
+cfg.SOLVER.STEPS = (1000, 1300)
+cfg.SOLVER.GAMMA = 0.05
+cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 64
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 20 #your number of classes + 1
+# cfg.TEST.EVAL_PERIOD = 500
+cfg.MODEL.RPN.NMS_THRESH = 0.8
+
 cfg.OUTPUT_DIR = output_dir
 cfg.TRAINING_NAME = training_name
 
 logger = setup_logger(os.path.join(output_dir, cfg.TRAINING_NAME))
 
-# intial lake set images from intial dataset path
-category_ratio = {
-    "text": .71,
-    "title": .19,
-    "list": .024,
-    "table": .031,
-    "figure": 0.05
-}
-
-# getting the new lake set and train set
-get_lakeset_images(dataset_dir, lake_data_dirs, int(arg.lake_size), category_ratio)
-get_lakeset_images(init_train_dataset_dir,
-                   train_data_dirs, int(arg.train_size), category_ratio)
+create_pascal_db()
 
 # given an initial_set and test_set dataset
 register_coco_instances(
@@ -101,9 +85,8 @@ register_coco_instances("test_set", {}, test_data_dirs[1], test_data_dirs[0])
 register_coco_instances("val_set", {}, val_data_dirs[1], val_data_dirs[0])
 
 logger.info("Starting Initial_set Training")
-cfg.MODEL_WEIGHTS = '../publaynet/Initial_model_weight/model_final.pkl'
+cfg.MODEL_WEIGHTS = 'pascal2007/model_final_68b088.pkl'
 model = create_model(cfg)
-torch.cuda.empty_cache()
 model.train()
 logger.info("Initial_set training complete")
 
@@ -112,8 +95,6 @@ result_val = []
 result_test = []
 # before starting the model active learning loop, calculating the embedding of the lake datset
 cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
-del model
-torch.cuda.empty_cache()
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
 result_val.append(result['val_set'])
@@ -123,8 +104,8 @@ i = 0
 try:
     while (i < iteration and budget > 0):
         # creating different flow for the different smi strategies
-        # query_path, category = find_missclassified_object(
-        #     result['test_set'])
+        query_path, category = find_missclassified_object(
+            result['test_set'])
         
         # dynamic query images after each iteraion
         create_new_query(train_data_dirs, query_path, category)
@@ -178,7 +159,7 @@ try:
                     db, cache_path="lake-" + str(i), RES_model="resnet152", pick_layer="avg")
 
                 AP, subset_result = infer_subset(
-                    query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category, private=private_category)
+                    query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category, private=None)
 
                 subset_result = list(
                     set(get_original_images_path(subset_result)))
@@ -195,10 +176,10 @@ try:
             # transferring images from lake set to train set
             aug_train_subset(
                 subset_result, train_data_dirs[1], lake_data_dirs[1], budget, lake_data_dirs, train_data_dirs)
-            image_list = get_category_details(
-                    subset_result, train_data_dirs, category)
-            category_selection.append([category[0], image_list])
-            print(category_selection)
+            # image_list = get_category_details(
+            #         subset_result, train_data_dirs, category)
+            # category_selection.append([category[0], image_list])
+            # print(category_selection)
         # removing the old training images from the detectron configuration and adding new one
         remove_dataset("initial_set")
         register_coco_instances(
@@ -208,7 +189,7 @@ try:
         torch.cuda.empty_cache()
         # before starting the model active learning loop, calculating the embedding of the lake datset
         cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
-        cfg.SOLVER.MAX_ITER = 3000
+        cfg.SOLVER.MAX_ITER = 1500
         model = create_model(cfg, "train")
         model.train()
 

@@ -10,3 +10,8 @@ PASCALVOC2007.zip
 .vscode
 --pycache__
 data.csv
+CBIR/database
+CBIR/src/__pycache__/
+sanskrit-manual-gt-new-master/
+query_data_img/
+utils/__pycache__/

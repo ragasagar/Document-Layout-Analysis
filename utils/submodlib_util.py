@@ -82,7 +82,7 @@ def FL1CMI_wrapper(lake_data, query_data, private_data, eta, image_list, budget=
     return [x[0] for x in greedyList]
 
 
-def subset(lake_data, query_data, eta, image_list, strategry, budget=10, metric="cosine", optimizer="NaiveGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False):
+def subset(lake_data, query_data, eta, image_list, strategry, private_data=None, budget=10, metric="cosine", optimizer="NaiveGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False):
     rem_budget = 0
     if (len(lake_data) < budget):
         rem_budget = budget - len(lake_data) + 1
@@ -103,7 +103,7 @@ def subset(lake_data, query_data, eta, image_list, strategry, budget=10, metric=
         subset = LogDetMI_wrapper(lake_data, query_data, 1, image_list, budget=budget, metric="cosine",
                                   optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
     elif (strategry == 'cmi'):
-        subset = FL1CMI_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
+        subset = FL1CMI_wrapper(lake_data, query_data, private_data, eta, image_list, budget=budget, metric="cosine",
                                 optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
 
     if (rem_budget > 0):

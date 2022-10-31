@@ -97,8 +97,8 @@ def infer_subset(queries, samples=None, db=None, sample_db_fn=None, depth=None,
             if q_cls in private:
                 private_embedding.append(q_hist)
         
-        subset_result = FL1CMI_wrapper(torch.Tensor(lake_embedding), torch.Tensor(query_embedding), torch.Tensor(private_embedding), 2, lake_image_list, budget=budget, metric='cosine',
-                           stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        subset_result = subset(torch.Tensor(lake_embedding), torch.Tensor(query_embedding), 2, lake_image_list, budget=budget, metric='cosine',
+                           stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=strategy, private_data=torch.Tensor(private_embedding))
     else:
         subset_result = subset(torch.Tensor(lake_embedding), torch.Tensor(query_embedding), 2, lake_image_list, budget=budget, metric='cosine',
                            stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=strategy)

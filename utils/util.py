@@ -5,6 +5,7 @@ from collections import OrderedDict
 import torch
 from tqdm import tqdm
 from torch.nn.parallel import DistributedDataParallel
+from detectron2.structures import Boxes, pairwise_iou
 
 
 from detectron2.data import (
@@ -286,6 +287,11 @@ def create_new_query(train_data_dirs, query_data_dir, category):
     category_list = {
         "text":1, "title":2, "list":3,"table":4, "figure":5
     }
+    # category_list = {
+    #         "aeroplane":1, "bicycle":2, "bird":3, "boat":4, "bottle":5, "bus":6, "car":7, "cat":8,
+    # "chair":9, "cow":10, "diningtable":11, "dog":12, "horse":13, "motorbike":14, "person":15,
+    # "pottedplant":16, "sheep":17, "sofa":18, "train":19, "tvmonitor":20}
+
     annotation = data['annotations']
     # final_lake_annotations = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))
     annotation = list(filter(lambda x: x['category_id'] == category_list[category[0]], annotation))
@@ -339,3 +345,31 @@ def get_category_details(subset_result, train_data_dirs, category):
     annotation = list(filter(lambda x: x['category_id'] == category_list[category[0]] and x['image_id'] in images, annotation))
     return len(annotation)
 
+def conf_matrix_calc(labels, detections, n_classes, conf_thresh, iou_thresh):
+    confusion_matrix = np.zeros([n_classes, n_classes])
+    l_classes = np.array(labels)[:, 0].astype(int)
+    l_bboxs = coco_bbox_to_coordinates((np.array(labels)[:, 1:]))
+    d_confs = np.array(detections)[:, 4]
+    d_bboxs = (np.array(detections)[:, :4])
+    d_classes = np.array(detections)[:, -1].astype(int)
+    detections = detections[np.where(d_confs > conf_thresh)]
+    labels_detected = np.zeros(len(labels))
+    detections_matched = np.zeros(len(labels))
+    for l_idx, (l_class, l_bbox) in enumerate(zip(l_classes, l_bboxs)):
+        for d_idx, (d_bbox, d_class) in enumerate(zip(d_bboxs, d_classes)):
+            iou = pairwise_iou(Boxes(torch.from_numpy(np.array([l_bbox]))), Boxes(torch.from_numpy(np.array([d_bbox]))))
+            if iou >= iou_thresh:
+                confusion_matrix[l_class, d_class] += 1
+                labels_detected[l_idx] = 1
+                detections_matched[d_idx] = 1
+    for i in np.where(labels_detected == 0)[0]:
+        confusion_matrix[l_classes[i], -1] += 1
+    for i in np.where(detections_matched == 0)[0]:
+        confusion_matrix[-1, d_classes[i]] += 1
+    return confusion_matrix
+
+def coco_bbox_to_coordinates(bbox):
+    out = bbox.copy().astype(float)
+    out[:, 2] = bbox[:, 0] + bbox[:, 2]
+    out[:, 3] = bbox[:, 1] + bbox[:, 3]
+    return out
