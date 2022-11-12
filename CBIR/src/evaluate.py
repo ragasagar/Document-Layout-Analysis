@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from scipy import spatial
 from tqdm import tqdm
-from utils.submodlib_util import FL1CMI_wrapper, Margin_Sampling, Random_wrapper, subset
+from utils.submodlib_util import FL1CMI_wrapper, Random_wrapper, subset
 import sys
 sys.path.append('../')
 

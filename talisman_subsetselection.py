@@ -6,43 +6,49 @@ from detectron2.engine import default_argument_parser
 from CBIR.src.DB import Database
 from CBIR.src.evaluate import infer_subset
 from CBIR.src.resnet import ResNetFeat
-from utils.detectron_util import create_model, crop_images_classwise, crop_images_classwise_ground_truth, do_evaluate, remove_dataset
-from utils.submodlib_util import Margin_Sampling, Random_wrapper
+from utils.detectron_util import create_model, do_evaluate, get_lake_embedding, get_query_embedding, remove_dataset
+from utils.kernel_util import  compute_queryimage_kernel
+from utils.submodlib_util import Random_wrapper, subset
 import pandas as pd
 from utils.util import aug_train_subset, create_dir, create_new_query, find_missclassified_object, get_category_details, get_lakeset_images, get_original_images_path, remove_dir
-import cProfile, pstats, io
-from pstats import SortKey
+
 import torch
 
 
 parser = default_argument_parser()
 
-parser.add_argument("--output_path",          default="fl1mi_test1", help="Output_path")
-parser.add_argument("--strategy", default="gcmi", help="subset selection strategy")
+parser.add_argument("--output_path",          default="talisman_test4", help="Output_path")
+parser.add_argument("--strategy", default="fl2mi", help="subset selection strategy")
 parser.add_argument("--total_budget",      default="500", type=int,  help="Total AL budget")
 parser.add_argument("--budget",   default="10", type=int, help="selection budget")
 parser.add_argument("--lake_size",   default="100", type=int, help="selection budget")
 parser.add_argument("--train_size",   default="100", type=int, help="selection budget")
 parser.add_argument("--category",   default="list", type=str, help="Targeted class")
-parser.add_argument("--device",   default="1", type=int, help="GPU device")
-parser.add_argument("--proposal_budget",   default="30", type=int, help="Proposal Budget for each image objects")
+parser.add_argument("--private_category",   default="text", type=str, help="Private Targeted class")
+parser.add_argument("--device",   default="0", type=int, help="GPU device")
+parser.add_argument("--proposal_budget",   default="40", type=int, help="Proposal Budget for each image objects")
+
 arg = parser.parse_args()
 print(arg)
-query_path = 'query_data_img/'+ arg.category;
-category = [arg.category];
 torch.cuda.set_device(arg.device)
+query_path = 'query_data_img/'+ arg.category;
+private_query_path = 'query_data_img/'+arg.private_category
+category = [arg.category];
+private_category = [arg.private_category]
+proposal_budget = arg.proposal_budget
+
 dataset_dir = ("../publaynet/publaynet/train5",
                "../publaynet/publaynet/train.json")
 init_train_dataset_dir = ("../publaynet/intial_train_img/train_data_img",
                           "../publaynet/intial_train_img/train_targeted.json")
 train_data_dirs = ("publaynet/train_data_img",
                    "publaynet/train_targeted.json")
-lake_data_dirs = ("publaynet/lake_data_img",
-                  "publaynet/lake_targeted.json")
-# test_data_dirs = ("publaynet/train_data_img",
-#                    "publaynet/train_targeted.json")
 # val_data_dirs = ("publaynet/train_data_img",
 #                    "publaynet/train_targeted.json")
+# test_data_dirs = ("publaynet/train_data_img",
+#                    "publaynet/train_targeted.json")
+lake_data_dirs = ("publaynet/lake_data_img",
+                   "publaynet/lake_targeted.json")
 test_data_dirs = ("../publaynet/test_data_img",
                   "../publaynet/test_targeted.json")
 val_data_dirs = ("../publaynet/val_data_img",
@@ -58,11 +64,10 @@ if (not os.path.exists(model_path)):
 # train a faster_rcnn model on the initial_set
 output_dir = os.path.join(model_path, "initial_training")
 config_file_path = '../publaynet/configs/publaynet/faster_rcnn_R_101_FPN_3x.yaml'
+prediction_score_threshold = 0.7
 selection_strag = arg.strategy
 selection_budget = arg.budget
 budget = arg.total_budget
-proposal_budget = arg.proposal_budget
-
 cfg = get_cfg()
 cfg.merge_from_file(config_file_path)
 cfg.DATASETS.TRAIN = ("initial_set",)
@@ -73,7 +78,7 @@ cfg.SOLVER.BASE_LR = 0.00025
 cfg.SOLVER.WARMUP_ITERS = 1000
 cfg.SOLVER.MAX_ITER = 6000
 cfg.SOLVER.IMS_PER_BATCH = 6
-cfg.MODEL.RPN.NMS_THRESH = 0.7
+cfg.MODEL.RPN.NMS_THRESH = 0.8
 cfg.MODEL.RPN.POST_NMS_TOPK_TEST: 2000
 cfg.TEST.EVAL_PERIOD = 1000
 cfg.OUTPUT_DIR = output_dir
@@ -89,7 +94,7 @@ category_ratio = {
     "table": .031,
     "figure": 0.05
 }
-
+ 
 # # getting the new lake set and train set
 # get_lakeset_images(dataset_dir, lake_data_dirs, int(arg.lake_size), category_ratio)
 # get_lakeset_images(init_train_dataset_dir,
@@ -104,6 +109,7 @@ register_coco_instances("val_set", {}, val_data_dirs[1], val_data_dirs[0])
 logger.info("Starting Initial_set Training")
 cfg.MODEL_WEIGHTS = '../publaynet/Initial_model_weight/model_final.pkl'
 model = create_model(cfg)
+torch.cuda.empty_cache()
 model.train()
 logger.info("Initial_set training complete")
 
@@ -112,6 +118,9 @@ result_val = []
 result_test = []
 # before starting the model active learning loop, calculating the embedding of the lake datset
 cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
+del model
+torch.cuda.empty_cache()
+
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
 result_val.append(result['val_set'])
@@ -121,70 +130,28 @@ i = 0
 try:
     while (i < iteration and budget > 0):
         # creating different flow for the different smi strategies
-        query_path, category = find_missclassified_object(
-            result['test_set'])
+        # query_path, category = find_missclassified_object(
+        #     result['test_set'])
         
         # dynamic query images after each iteraion
         create_new_query(train_data_dirs, query_path, category)
 
         if (selection_strag != "margin"):
 
-            if (selection_strag == "margin"):
-                subset_result = Margin_Sampling(
-                    lake_data_dirs[0], query_path, model, budget)
-            elif (selection_strag != "random"):
-                # cropping and calculating the resnet embedding for the lake dataset images
-
-                # creating new query set for under performing class for each iteration
-                remove_dir(os.path.join(model_path, "query_images"))
-                try:
-                    os.remove(os.path.join(model_path, "data_query.csv"))
-                except:
-                    pass
-
-                if (i <= 40):
-                    crop_images_classwise_ground_truth(train_data_dirs[1], query_path, os.path.join(
-                        model_path, "query_images"), category)
-                else:
-                    crop_images_classwise(
-                        model, query_path, os.path.join(model_path, "query_images"))
-                db2 = Database(dir=os.path.join(model_path, "query_images"), csv=os.path.join(
-                    model_path, "data_query.csv"))
-
-                # # removing the old images calculation
-                f_model = ResNetFeat()
-                query_set_embeddings = f_model.make_samples(
-                    db2, cache_path="query-"+str(i))
-
-                # removing the previous crop images
-                remove_dir(os.path.join(model_path, "lake_images"))
-                try:
-                    os.remove(os.path.join(model_path, "data.csv"))
-                except:
-                    pass
-                # creating the new crop images
-                crop_images_classwise(
-                    model, lake_data_dirs[0], os.path.join(model_path, "lake_images"), proposal_budget=proposal_budget)
-                db = Database(dir=os.path.join(model_path, "lake_images"),
-                              csv=os.path.join(model_path, "data.csv"))
+            
+            if (selection_strag != "random"):
+                # cropping and calculating the resnet embedding for the lake dataset images                
+                _, query_set_embeddings = get_query_embedding(model, query_path, category[0], train_json_path=train_data_dirs[1], device=arg.device)
 
                 # Obtaining the new lake embedding using new trained model
-                lake_set_embeddings = f_model.make_samples(
-                    db, cache_path="lake-" + str(i), RES_model="resnet152", pick_layer="avg")
+                image_list, lake_set_embeddings = get_lake_embedding(model, lake_data_dirs[0], proposal_budget=proposal_budget)
 
-                pr = cProfile.Profile()
-                pr.enable()
-                AP, subset_result = infer_subset(
-                        query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category)
-                pr.disable()
-                s = io.StringIO()
-                sortby = SortKey.CUMULATIVE
-                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-                ps.print_stats()
-                
-                print(s.getvalue())
-                subset_result = list(
-                    set(get_original_images_path(subset_result)))
+                query_sij = compute_queryimage_kernel(query_set_embeddings, lake_set_embeddings);
+
+                subset_result = subset([], query_sij, 1,image_list, budget=selection_budget, metric='cosine',
+                           stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag, kernel=True);
+
+                subset_result = list(set(subset_result))
                 print(subset_result)
             else:
                 lake_image_list = os.listdir(lake_data_dirs[0])
@@ -270,14 +237,3 @@ finally:
     csv = pd.DataFrame(final_data, columns=temp)
     csv.to_csv(os.path.join(output_dir, '{}'.format(
         "test_scores"+selection_strag+".csv")))
-    # step 2
-    # evaluate the inital model and get worst performing class
-
-    # step 3
-    # get embeddings for initial and lakeset from RESNET50
-
-    # step 4
-    # select query images from initial set based on worst performing class
-
-    # step 5
-    # subset selection based on query and lakeset embeddings

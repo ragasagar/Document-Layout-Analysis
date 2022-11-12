@@ -39,6 +39,16 @@ def FL2MI_wrapper(lake_data, query_data, eta, image_list, budget=10, metric="cos
                               stopIfNegativeGain=stopIfNegativeGain, verbose=verbose)
     return [x[0] for x in greedyList]
 
+def FL2MI_wrapper_kernel(query_data, eta, budget=10, metric="cosine", optimizer="NaiveGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False):
+    obj = FacilityLocationVariantMutualInformationFunction(n=query_data.shape[1],
+                                                              num_queries=query_data.shape[0], 
+                                                              query_sijs=query_data.T, 
+                                                              queryDiversityEta=eta)
+
+    greedyList = obj.maximize(budget=budget, optimizer=optimizer, stopIfZeroGain=stopIfZeroGain,
+                              stopIfNegativeGain=stopIfNegativeGain, verbose=verbose)
+    return [x[0] for x in greedyList]
+
 
 def COM_wrapper(lake_data, query_data, eta, image_list, budget=10, metric="cosine", optimizer="LazierThanLazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False):
     obj = ConcaveOverModularFunction(n=lake_data.shape[0], num_queries=query_data.shape[0], data=lake_data,
@@ -82,36 +92,45 @@ def FL1CMI_wrapper(lake_data, query_data, private_data, eta, image_list, budget=
     return [x[0] for x in greedyList]
 
 
-def subset(lake_data, query_data, eta, image_list, strategry, private_data=None, budget=10, metric="cosine", optimizer="NaiveGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False):
-    rem_budget = 0
-    if (len(lake_data) < budget):
-        rem_budget = budget - len(lake_data) + 1
-        budget = len(lake_data)-1
-    if (strategry == "fl1mi"):
-        subset = FL1MI_wrapper(lake_data, query_data, 1.5, image_list, budget=budget, metric=metric,
+def subset(lake_data, query_data, eta, image_list, strategry, private_data=None, budget=10, metric="cosine",
+            optimizer="NaiveGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, kernel=False):
+    
+    if(strategry == "fl2mi" and kernel):
+        subset = FL2MI_wrapper_kernel(query_data, eta, budget=budget, metric="cosine",
                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
-    elif (strategry == "fl2mi"):
-        subset = FL2MI_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
-                               optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
-    elif (strategry == "com"):
-        subset = COM_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
-                             optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
-    elif (strategry == "gcmi"):
-        subset = GCMI_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
-                              optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
-    elif (strategry == "logdet"):
-        subset = LogDetMI_wrapper(lake_data, query_data, 1, image_list, budget=budget, metric="cosine",
-                                  optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
-    elif (strategry == 'cmi'):
-        subset = FL1CMI_wrapper(lake_data, query_data, private_data, eta, image_list, budget=budget, metric="cosine",
-                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+    else:
+        
+        if (len(lake_data) < budget):
+            rem_budget = budget - len(lake_data) + 1
+            budget = len(lake_data)-1
 
-    if (rem_budget > 0):
-        all_lake_idx = list(range(len(image_list)))
-        remain_lake_idx = list(set(all_lake_idx) - set(subset))
-        random_subset_idx = list(np.random.choice(
-            np.array(remain_lake_idx), size=int(rem_budget), replace=False))
-        subset += random_subset_idx
+        rem_budget = 0
+        if (strategry == "fl1mi"):
+            subset = FL1MI_wrapper(lake_data, query_data, 1.5, image_list, budget=budget, metric=metric,
+                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        elif (strategry == "fl2mi"):
+            subset = FL2MI_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
+                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        elif (strategry == "com"):
+            subset = COM_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
+                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        elif (strategry == "gcmi"):
+            subset = GCMI_wrapper(lake_data, query_data, eta, image_list, budget=budget, metric="cosine",
+                                optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        elif (strategry == "logdet"):
+            subset = LogDetMI_wrapper(lake_data, query_data, 1, image_list, budget=budget, metric="cosine",
+                                    optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+        elif (strategry == 'cmi'):
+            subset = FL1CMI_wrapper(lake_data, query_data, private_data, eta, image_list, budget=budget, metric="cosine",
+                                    optimizer="LazyGreedy", stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False)
+
+        if (rem_budget > 0):
+            all_lake_idx = list(range(len(image_list)))
+            remain_lake_idx = list(set(all_lake_idx) - set(subset))
+            random_subset_idx = list(np.random.choice(
+                np.array(remain_lake_idx), size=int(rem_budget), replace=False))
+            subset += random_subset_idx
+
     return [image_list[i] for i in subset]
 
 
@@ -218,9 +237,4 @@ def submod_results(lake_data, query_data, eta, targeted_classes, image_list, ann
     return Random_percent, FL1MI_percent, FL2MI_percent, COM_percent, GCMI_percent, LogDetMI_percent
 
 
-def Margin_Sampling(lake_dataset, query_dataset, model: DefaultPredictor, budget=10):
-    unlabeled_lake_dataset = DocbankDataset(lake_dataset)
-    query_dataset = DocbankDataset(lake_dataset)
-    model = model.model
-    strategy = MarginSampling(unlabeled_x=unlabeled_lake_dataset,
-                              query_dataset=query_dataset, net=model, nclasses=12)
+

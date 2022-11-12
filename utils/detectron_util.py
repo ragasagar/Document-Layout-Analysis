@@ -16,7 +16,8 @@ from detectron2.evaluation import (
     inference_on_dataset,
 )
 from detectron2.engine import DefaultPredictor, DefaultTrainer
-
+from detectron2.structures import Boxes
+import torch
 
 # logger = setup_logger("Util Logger")
 
@@ -82,7 +83,7 @@ def remove_dataset(name):
         DatasetCatalog.remove(name)
         MetadataCatalog.remove(name)
 
-def crop_images_classwise(model:DefaultPredictor, src_path, dest_path):
+def crop_images_classwise(model:DefaultPredictor, src_path, dest_path, proposal_budget:int):
     if not os.path.exists(dest_path+'/obj_images'):
         os.makedirs(dest_path+'/obj_images')
     obj_im_dir = dest_path+'/obj_images'
@@ -98,13 +99,14 @@ def crop_images_classwise(model:DefaultPredictor, src_path, dest_path):
         # print(outputs["instances"].pred_classes.cpu().numpy().tolist())
         boxes = outputs["instances"].pred_boxes
         classes=outputs["instances"].pred_classes.cpu().numpy().tolist()
+        max_score_order = torch.argsort(outputs["instances"].scores).tolist()
 
         for singleclass in classes:
             if not os.path.exists(os.path.join(dest_path,'obj_images',MAPPING[str(singleclass)])):
                 os.makedirs(os.path.join(dest_path,'obj_images',MAPPING[str(singleclass)]))
 
         img = Image.open(os.path.join(src_path, d))
-        for idx,box in enumerate(list(boxes)):
+        for idx,box in enumerate(list(boxes[max_score_order[:proposal_budget]])):
             no_of_objects+=1
             box = box.detach().cpu().numpy()
         
@@ -148,3 +150,77 @@ def crop_images_classwise_ground_truth(train_json_path, src_path, dest_path, cat
             crop_img.save(os.path.join(obj_im_dir,category[0],os.path.split(os.path.join(src_path, d))[1].replace(".jpg","")+"_"+str(idx)+".jpg"))
 
     print("Number of objects: "+str(no_of_objects))
+
+
+
+def get_query_embedding(predictor:DefaultPredictor, image_dir:str, target_class:str, train_json_path, device):
+    embeddings = []
+    final_im_list = []
+    with torch.no_grad():
+        MAPPING = {"text":1, "title": 2,"list":3,"table":4,"figure":5}
+        no_of_objects=0
+        with open(train_json_path) as f:
+            data = json.load(f)
+        annotations = data['annotations']
+        file_names = os.listdir(image_dir)
+        file_ids = {x['id']:x['file_name'] for x in data['images'] if x['file_name'] in file_names}
+        for idx, im in tqdm(file_ids.items()):
+            image_path = os.path.join(image_dir, im)
+            image = cv2.imread(image_path)
+            height, width = image.shape[:2]
+            image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+            inputs = [{"image": image, "height": height, "width": width}]
+            images = predictor.model.preprocess_image(inputs)
+        
+            features = predictor.model.backbone(images.tensor)
+            
+            boxes = [x['bbox'] for x in annotations if x['image_id'] == idx and x['category_id'] == MAPPING[target_class] ]
+            box_features = [features[f] for f in predictor.model.roi_heads.in_features]
+            box_features_from_pooler = predictor.model.roi_heads.box_pooler(box_features, [Boxes(torch.Tensor(boxes).to(device))])
+            box_features_from_head = predictor.model.roi_heads.box_head(box_features_from_pooler)
+
+            box_features_weights=[];    
+            for i in range(len(boxes)):
+                box_features_weights.append(box_features_from_head[i,:].cpu().numpy())
+            
+            for img_roi_feature in box_features_weights:
+                embeddings.append(img_roi_feature)
+                final_im_list.append(im)
+        del features, box_features, box_features_from_pooler, box_features_from_head
+    return final_im_list, np.stack(embeddings)
+
+        
+def get_lake_embedding(predictor:DefaultPredictor, image_dir:str, proposal_budget:int):
+    embeddings = []
+    final_im_list = []
+    with torch.no_grad():
+        for im in tqdm(os.listdir(image_dir)):
+            image_path = os.path.join(image_dir, im)
+            image = cv2.imread(image_path)
+            height, width = image.shape[:2]
+            image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+            inputs = [{"image": image, "height": height, "width": width}]
+            images = predictor.model.preprocess_image(inputs)
+
+            features = predictor.model.backbone(images.tensor)
+            proposals, _ = predictor.model.proposal_generator(images, features)
+            instances, _ = predictor.model.roi_heads(images, features, proposals)
+            pred_classes = instances[0].pred_classes.cpu().numpy().tolist()
+            max_score_order = torch.argsort(instances[0].scores).tolist()
+
+            if(proposal_budget > len(max_score_order)):
+                proposal_budget = len(max_score_order)
+
+            box_features = [features[f] for f in predictor.model.roi_heads.in_features]
+            box_features_from_pooler = predictor.model.roi_heads.box_pooler(box_features, [x.pred_boxes for x in instances])
+            box_features_from_head = predictor.model.roi_heads.box_head(box_features_from_pooler)
+
+            
+            for i in max_score_order[:proposal_budget]:
+                embeddings.append(box_features_from_head[i,:].cpu().numpy())
+                final_im_list.append(im)
+        del features, proposals, instances, pred_classes, box_features, box_features_from_pooler, box_features_from_head
+    return final_im_list, np.stack(embeddings)
+
+
+
