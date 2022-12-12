@@ -135,7 +135,7 @@ class ResidualNet(ResNet):
 
 class ResNetFeat(object):
 
-    def make_samples(self, db, verbose=True, cache_path="", RES_model="resnet152", pick_layer="avg"):
+    def make_samples(self, db, verbose=True, cache_path="", RES_model="resnet101", pick_layer="avg"):
         sample_cache = '{}-{}-{}'.format(RES_model, pick_layer, cache_path)
 
         try:

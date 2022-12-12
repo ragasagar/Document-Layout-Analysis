@@ -93,7 +93,8 @@ logger.info("Initial_set training complete")
 iteration = 100
 result_val = []
 result_test = []
-# before starting the model active learning loop, calculating the embedding of the lake datset
+    # step 2
+    # evaluate the inital model and get worst performing class
 cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
@@ -248,8 +249,6 @@ finally:
     csv = pd.DataFrame(final_data, columns=temp)
     csv.to_csv(os.path.join(output_dir, '{}'.format(
         "test_scores"+selection_strag+".csv")))
-    # step 2
-    # evaluate the inital model and get worst performing class
 
     # step 3
     # get embeddings for initial and lakeset from RESNET50
