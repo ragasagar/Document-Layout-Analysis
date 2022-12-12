@@ -54,10 +54,10 @@ lake_data_dirs = ("publaynet/lake_data_img",
 #                    "publaynet/train_targeted.json")
 # val_data_dirs = ("publaynet/train_data_img",
 #                    "publaynet/train_targeted.json")
-test_data_dirs = ("../publaynet/test_data_img",
-                  "../publaynet/test_targeted.json")
-val_data_dirs = ("../publaynet/val_data_img",
-                 "../publaynet/val_targeted.json")
+test_data_dirs = ("publaynet/test_data_img",
+                  "publaynet/test_targeted.json")
+val_data_dirs = ("publaynet/val_data_img",
+                 "publaynet/val_targeted.json")
 
 train_path = 'model_result'
 training_name = arg.output_path
