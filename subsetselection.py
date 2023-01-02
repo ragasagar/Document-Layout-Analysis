@@ -54,10 +54,10 @@ lake_data_dirs = ("publaynet/lake_data_img",
 #                    "publaynet/train_targeted.json")
 # val_data_dirs = ("publaynet/train_data_img",
 #                    "publaynet/train_targeted.json")
-test_data_dirs = ("publaynet/test_data_img",
-                  "publaynet/test_targeted.json")
-val_data_dirs = ("publaynet/val_data_img",
-                 "publaynet/val_targeted.json")
+test_data_dirs = ("../publaynet/test_data_img",
+                  "../publaynet/test_targeted.json")
+val_data_dirs = ("../publaynet/val_data_img",
+                 "../publaynet/val_targeted.json")
 
 train_path = 'model_result'
 training_name = arg.output_path
@@ -83,7 +83,7 @@ cfg.SOLVER.BASE_LR = 0.00025
 cfg.SOLVER.WARMUP_ITERS = 1000
 cfg.SOLVER.MAX_ITER = 6000
 cfg.SOLVER.IMS_PER_BATCH = 6
-cfg.MODEL.RPN.NMS_THRESH = 0.7
+cfg.MODEL.RPN.NMS_THRESH = 0.8
 cfg.MODEL.RPN.POST_NMS_TOPK_TEST: 2000
 cfg.TEST.EVAL_PERIOD = 1000
 cfg.OUTPUT_DIR = output_dir
