@@ -27,7 +27,7 @@ from utils.util import (aug_train_subset, create_dir, create_new_query,
 
 parser = default_argument_parser()
 
-parser.add_argument("--output_path",          default="fl1mi_test", help="Output_path")
+parser.add_argument("--output_path",          default="tada_gcmi", help="Output_path")
 parser.add_argument("--strategy", default="fl2mi", help="subset selection strategy")
 parser.add_argument("--total_budget",      default="500", type=int,  help="Total AL budget")
 parser.add_argument("--budget",   default="10", type=int, help="selection budget")
@@ -40,7 +40,7 @@ parser.add_argument("--iterations",   default="40", type=int, help="Active learn
 arg = parser.parse_args()
 print(arg)
 query_path = 'query_data_img/'+ arg.category;
-category = [arg.category];
+category = [arg.category]
 torch.cuda.set_device(arg.device)
 dataset_dir = ("../publaynet/publaynet/train5",
                "../publaynet/publaynet/train.json")
@@ -65,7 +65,7 @@ model_path = os.path.join(train_path, training_name)
 if (not os.path.exists(model_path)):
     create_dir(model_path)
 
-
+# train a faster_rcnn model on the initial_set
 output_dir = os.path.join(model_path, "initial_training")
 config_file_path = '../publaynet/configs/publaynet/faster_rcnn_R_101_FPN_3x.yaml'
 selection_strag = arg.strategy
@@ -85,13 +85,14 @@ cfg.SOLVER.MAX_ITER = 6000
 cfg.SOLVER.IMS_PER_BATCH = 6
 cfg.MODEL.RPN.NMS_THRESH = 0.8
 cfg.MODEL.RPN.POST_NMS_TOPK_TEST: 2000
-cfg.TEST.EVAL_PERIOD = 1000
+# cfg.TEST.EVAL_PERIOD = 1000
 cfg.OUTPUT_DIR = output_dir
 cfg.TRAINING_NAME = training_name
 
 logger = setup_logger(os.path.join(output_dir, cfg.TRAINING_NAME))
 
 # category ratio based on the publaynet paper.
+# intial lake set images from intial dataset path
 category_ratio = {
     "text": .71,
     "title": .19,
@@ -116,14 +117,19 @@ register_coco_instances("val_set", {}, val_data_dirs[1], val_data_dirs[0])
 logger.info("Starting Initial_set Training")
 cfg.MODEL_WEIGHTS = '../publaynet/Initial_model_weight/model_final.pkl'
 model = create_model(cfg)
+torch.cuda.empty_cache()
 model.train()
 logger.info("Initial_set training complete")
 
 iteration = arg.iterations
 result_val = []
 result_test = []
+
+del model
+torch.cuda.empty_cache()
 # step 2
 # evaluate the inital model and get worst performing classcfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth
+cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
 result_val.append(result['val_set'])
@@ -136,8 +142,8 @@ try:
         # get embeddings for initial and lakeset from RESNET101
         
         # creating different flow for the different smi strategies
-        query_path, category = find_missclassified_object(
-            result['test_set'])
+        # query_path, category = find_missclassified_object(
+        #     result['test_set'])
         
         # dynamic query images after each iteraion
         create_new_query(train_data_dirs, query_path, category)
@@ -191,37 +197,37 @@ try:
             '''
             The below code uses the default libary for kernel computation and  subset selection.
             '''
-            # # pr = cProfile.Profile()
-            # # pr.enable()
-            # AP, subset_result = infer_subset(
-            #         query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category)
-            # pr.disable()
-            # s = io.StringIO()
-            # sortby = SortKey.CUMULATIVE
-            # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            # ps.print_stats()
+            pr = cProfile.Profile()
+            pr.enable()
+            AP, subset_result = infer_subset(
+                    query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category)
+            pr.disable()
+            s = io.StringIO()
+            sortby = SortKey.CUMULATIVE
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
             
-            # print(s.getvalue())
+            print(s.getvalue())
 
             '''
             The below method first compute the query kernel matrix and make use of subset selection library to find subset.
             '''
-            query_embedding = []
+            # query_embedding = []
 
-            for idx, query in enumerate(query_set_embeddings, start=1):
-                q_img, q_cls, q_hist = query['img'], query['cls'], query['hist']
-                if q_cls in category:
-                    query_embedding.append(q_hist)
+            # for idx, query in enumerate(query_set_embeddings, start=1):
+            #     q_img, q_cls, q_hist = query['img'], query['cls'], query['hist']
+            #     if q_cls in category:
+            #         query_embedding.append(q_hist)
 
-            lake_embedding = []
-            lake_image_list = []
-            for idx, sample in enumerate(lake_set_embeddings, start=1):
-                s_img, s_cls, s_hist = sample['img'], sample['cls'], sample['hist']
-                lake_embedding.append(s_hist)
-                lake_image_list.append(s_img)
-            query_sij = compute_queryimage_kernel(np.stack(query_embedding), np.stack(lake_embedding));
-            subset_result = subset([], query_sij, 1,lake_image_list, budget=selection_budget, metric='cosine',
-                        stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag, kernel=True);
+            # lake_embedding = []
+            # lake_image_list = []
+            # for idx, sample in enumerate(lake_set_embeddings, start=1):
+            #     s_img, s_cls, s_hist = sample['img'], sample['cls'], sample['hist']
+            #     lake_embedding.append(s_hist)
+            #     lake_image_list.append(s_img)
+            # query_sij = compute_queryimage_kernel(np.stack(query_embedding), np.stack(lake_embedding));
+            # subset_result = subset([], query_sij, 1,lake_image_list, budget=selection_budget, metric='cosine',
+            #             stopIfZeroGain=False, stopIfNegativeGain=False, verbose=False, strategry=selection_strag, kernel=True);
 
             # subset_result = list(set(subset_result))
             # print(subset_result)

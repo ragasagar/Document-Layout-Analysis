@@ -117,13 +117,24 @@ def crop_images_classwise(model: DefaultPredictor, src_path, dest_path,
     }
     no_of_objects = 0
     for d in tqdm(os.listdir(src_path)):
-        img = cv2.imread(os.path.join(src_path, d))
-        outputs = model(img)
-        # print(outputs["instances"].pred_classes.cpu().numpy().tolist())
-        boxes = outputs["instances"].pred_boxes
-        classes = outputs["instances"].pred_classes.cpu().numpy().tolist()
-        max_score_order = torch.argsort(outputs["instances"].scores).tolist()
+        image = cv2.imread(os.path.join(src_path, d))
+        height, width = image.shape[:2]
+        image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+        inputs = [{"image": image, "height": height, "width": width}]
+        images = model.model.preprocess_image(inputs)
 
+        features = model.model.backbone(images.tensor)
+        proposals, _ = model.model.proposal_generator(images, features)
+        instances, _ = model.model.roi_heads(images, features,
+                                                     proposals)
+        # print(outputs["instances"].pred_classes.cpu().numpy().tolist())
+        boxes = instances[0].pred_boxes
+        classes = instances[0].pred_classes.cpu().numpy().tolist()
+        max_score_order = torch.argsort(instances[0].scores).tolist()
+        
+        if (proposal_budget > len(max_score_order)):
+            proposal_budget = len(max_score_order)
+        
         for singleclass in classes:
             if not os.path.exists(
                     os.path.join(dest_path, 'obj_images',
@@ -263,7 +274,7 @@ ROI pooler to get respective bounding box feature map.
 '''
 
 
-def get_lake_embedding(predictor: DefaultPredictor, image_dir: str,
+def  get_lake_embedding(predictor: DefaultPredictor, image_dir: str,
                        proposal_budget: int):
     embeddings = []
     final_im_list = []

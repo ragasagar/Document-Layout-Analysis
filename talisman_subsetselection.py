@@ -17,7 +17,7 @@ import torch
 
 parser = default_argument_parser()
 
-parser.add_argument("--output_path",          default="talisman_test4", help="Output_path")
+parser.add_argument("--output_path",          default="talisman_test1_gcmi", help="Output_path")
 parser.add_argument("--strategy", default="fl2mi", help="subset selection strategy")
 parser.add_argument("--total_budget",      default="500", type=int,  help="Total AL budget")
 parser.add_argument("--budget",   default="10", type=int, help="selection budget")
@@ -26,16 +26,16 @@ parser.add_argument("--train_size",   default="100", type=int, help="selection b
 parser.add_argument("--category",   default="list", type=str, help="Targeted class")
 parser.add_argument("--private_category",   default="text", type=str, help="Private Targeted class")
 parser.add_argument("--device",   default="0", type=int, help="GPU device")
-parser.add_argument("--proposal_budget",   default="40", type=int, help="Proposal Budget for each image objects")
+parser.add_argument("--proposal_budget",   default="30", type=int, help="Proposal Budget for each image objects")
+parser.add_argument("--iterations",   default="40", type=int, help="Active learning iteration")
 
 arg = parser.parse_args()
 print(arg)
-torch.cuda.set_device(arg.device)
 query_path = 'query_data_img/'+ arg.category;
 private_query_path = 'query_data_img/'+arg.private_category
-category = [arg.category];
+category = [arg.category]
+torch.cuda.set_device(arg.device)
 private_category = [arg.private_category]
-proposal_budget = arg.proposal_budget
 
 dataset_dir = ("../publaynet/publaynet/train5",
                "../publaynet/publaynet/train.json")
@@ -68,6 +68,8 @@ prediction_score_threshold = 0.7
 selection_strag = arg.strategy
 selection_budget = arg.budget
 budget = arg.total_budget
+proposal_budget = arg.proposal_budget
+
 cfg = get_cfg()
 cfg.merge_from_file(config_file_path)
 cfg.DATASETS.TRAIN = ("initial_set",)
@@ -113,7 +115,7 @@ torch.cuda.empty_cache()
 model.train()
 logger.info("Initial_set training complete")
 
-iteration = 100
+iteration = arg.iterations
 result_val = []
 result_test = []
 # before starting the model active learning loop, calculating the embedding of the lake datset
@@ -121,6 +123,8 @@ cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
 del model
 torch.cuda.empty_cache()
 
+# step 2
+# evaluate the inital model and get worst performing classcfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
 result_val.append(result['val_set'])
