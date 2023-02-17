@@ -8,16 +8,6 @@ from torch.nn.parallel import DistributedDataParallel
 from detectron2.structures import Boxes, pairwise_iou
 
 
-from detectron2.data import (
-    DatasetMapper,
-    MetadataCatalog,
-    build_detection_test_loader,
-)
-from detectron2.evaluation import (
-        COCOEvaluator,
-    inference_on_dataset,
-)
-
 import numpy as np
 import os, json, random, shutil
 import torch
@@ -65,7 +55,7 @@ def aug_train_subset(subset_result, train_data_json, lake_data_json, budget, src
     final_lake_annotations = list(filter(lambda x: x['image_id'] not in image_id, lake_dataset['annotations']))
 
     #moving data from lake set to train set.
-    change_dir(subset_result, src_dir, dest_dir)
+    change_dir_sanskrit(subset_result, src_dir, dest_dir)
 
     #changing the coco-file for annotations
     create_labels_update(train_image_list, train_annotations, categories, train_data_json)
@@ -119,6 +109,44 @@ def change_dir(image_results, src_dir, dest_dir):
         except:
             pass
 
+def change_dir_sanskrit(image_results, src_dir, dest_dir):
+    names = [names.split("/")[-1].replace(".jpeg", "") for names in image_results]
+    for index in range(len(names)):
+        # Source path
+        source_img = os.path.join(src_dir[0], "{}.jpeg".format(names[index]))
+        # Destination path
+        # source_txt = os.path.join(src_dir[1], "{}.xml".format(names[index]))
+
+        destination_img = os.path.join(dest_dir[0], "{}.jpeg".format(names[index]))
+        # Destination path
+        # destination_txt = os.path.join(dest_dir[1], "{}.xml".format(names[index]))
+        
+        if not os.path.exists(dest_dir[0]) or not os.path.exists(dest_dir[1]):
+            os.mkdir(dest_dir[0])
+            os.mkdir(dest_dir[1])
+        
+        try:
+            shutil.copy(source_img, destination_img)
+            # shutil.copy(source_txt, destination_txt)
+            # print("File copied successfully.")
+        except shutil.SameFileError:
+            print("Source and destination represents the same file.")
+        
+        # If there is any permission issue
+        except PermissionError:
+            print("Permission denied.")
+        
+        # For other errors
+        except Exception as e:
+            print("Error occurred while copying file.", e)
+
+
+        # removing the data from the lake data
+        try:
+            os.remove(os.path.join(src_dir[0], "{}.jpeg".format(names[index])))
+            # os.remove(os.path.join(src_dir[1], "{}.xml".format(names[index])))
+        except:
+            pass
 
 def create_labels(indices, images, annotations, categories, filename):
     labels = {}
@@ -155,24 +183,25 @@ def copy_trained_image(train_data_dirs:tuple):
     except Exception as e:
         logger.error ("Error while copying the original trained images:", e)
 
-def create_query_dataset(categories):
-    category_list = {
-        "text":1, "title":2, "list":3,"table":4, "figure":5
-    }
+def create_query_dataset(categories, path):
+    # category_list = {
+    #     "text":1, "title":2, "list":3,"table":4, "figure":5
+    # }
+    category_list = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
 
-    with open("publaynet/train.json") as f:
+    with open(path) as f:
         data = json.load(f);
         query_im = data['images']
-        ids = [x['id'] for x in query_im if x['file_name'] in os.listdir("publaynet/train")];
+        ids = [x['id'] for x in query_im if x['file_name'] in os.listdir("sanskrit_tada/train_data_img")];
         annotations = data['annotations']
         for category in tqdm(categories):
             category_id = category_list[category];
-            query_data_dirs = ("publaynet/train", "publaynet/train.json")
+            query_data_dirs = ("sanskrit_tada/train_data_img", "sanskrit_tada/train_targeted.json")
             final_query_data_dirs = ("query_data_img/"+category, "query_data_txt_anno/"+category)
             # print(annotations[:5])
             images = set();
             for annotation in annotations:
-                if(annotation['category_id'] == category_id, annotation['image_id'] in ids):
+                if(annotation['category_id'] == category_id and annotation['image_id'] in ids):
                     images.add(annotation['image_id']) 
                     if(len(images)==50):
                         break
@@ -331,14 +360,17 @@ def create_new_query(train_data_dirs, query_data_dir, category):
 def get_original_images_path(subset_result:list):
     return ["_".join(x.split("/")[-1].split("_")[:2])+ ".jpg" for x in subset_result]
 
+def get_original_images_path_sanskrit(subset_result:list):
+    return ["_".join(x.split("/")[-1].split("_")[:2]) for x in subset_result]
+
 
 def get_category_details(subset_result, train_data_dirs, category):
     with open(train_data_dirs[1], "r") as f:
         data = json.load(f);
-    category_list = {
-        "text":1, "title":2, "list":3,"table":4, "figure":5
-    }
-
+    # category_list = {
+    #     "text":1, "title":2, "list":3,"table":4, "figure":5
+    # }
+    category_list = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
     images = [x['id'] for x in  data['images'] if x['file_name'] in subset_result]
     annotation = data['annotations']
     # final_lake_annotations = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))

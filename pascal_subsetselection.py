@@ -18,23 +18,44 @@ import torch
 torch.cuda.set_device(1)
 parser = default_argument_parser()
 
-parser.add_argument("--output_path",          default="fl1mi_test", help="Output_path")
-parser.add_argument("--strategy", default="fl1mi", help="subset selection strategy")
-parser.add_argument("--total_budget",      default="200", type=int,  help="Total AL budget")
-parser.add_argument("--budget",   default="20", type=int, help="selection budget")
-parser.add_argument("--lake_size",   default="100", type=int, help="selection budget")
-parser.add_argument("--train_size",   default="100", type=int, help="selection budget")
-parser.add_argument("--category",   default="list", type=str, help="Targeted class")
-parser.add_argument("--private_category",   default="text", type=str, help="Private Targeted class")
- 
+parser.add_argument("--output_path", default="fl1mi_test", help="Output_path")
+parser.add_argument("--strategy",
+                    default="fl1mi",
+                    help="subset selection strategy")
+parser.add_argument("--total_budget",
+                    default="200",
+                    type=int,
+                    help="Total AL budget")
+parser.add_argument("--budget",
+                    default="20",
+                    type=int,
+                    help="selection budget")
+parser.add_argument("--lake_size",
+                    default="100",
+                    type=int,
+                    help="selection budget")
+parser.add_argument("--train_size",
+                    default="100",
+                    type=int,
+                    help="selection budget")
+parser.add_argument("--category",
+                    default="list",
+                    type=str,
+                    help="Targeted class")
+parser.add_argument("--private_category",
+                    default="text",
+                    type=str,
+                    help="Private Targeted class")
+
 arg = parser.parse_args()
 print(arg)
-query_path = 'query_data_img/'+ arg.category;
-private_query_path = 'query_data_img/'+arg.private_category
-category = [arg.category];
+query_path = 'query_data_img/' + arg.category
+private_query_path = 'query_data_img/' + arg.private_category
+category = [arg.category]
 private_category = [arg.private_category]
 
-train_data_dirs = ("pascal2007/train_data_img", "pascal2007/train_targeted.json")
+train_data_dirs = ("pascal2007/train_data_img",
+                   "pascal2007/train_targeted.json")
 lake_data_dirs = ("pascal2007/lake_data_img", "pascal2007/lake_targeted.json")
 test_data_dirs = ("pascal2007/test_data_img", "pascal2007/test_targeted.json")
 val_data_dirs = ("pascal2007/val_data_img", "pascal2007/val_targeted.json")
@@ -55,19 +76,23 @@ selection_budget = arg.budget
 budget = arg.total_budget
 
 cfg = get_cfg()
-cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
-cfg.DATASETS.TRAIN = ("initial_set",)
-cfg.DATASETS.TEST = ("val_set","test_set")
+cfg.merge_from_file(
+    model_zoo.get_config_file(
+        "COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"))
+cfg.DATASETS.TRAIN = ("initial_set", )
+cfg.DATASETS.TEST = ("val_set", "test_set")
 cfg.DATALOADER.NUM_WORKERS = 6
-cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml")  # Let training initialize from model zoo
+cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
+    "COCO-Detection/faster_rcnn_X_101_32x8d_FPN_3x.yaml"
+)  # Let training initialize from model zoo
 cfg.SOLVER.IMS_PER_BATCH = 4
 cfg.SOLVER.BASE_LR = 0.00025
 cfg.SOLVER.WARMUP_ITERS = 1000
-cfg.SOLVER.MAX_ITER = 2500 #adjust up if val mAP is still rising, adjust down if overfit
+cfg.SOLVER.MAX_ITER = 2500  #adjust up if val mAP is still rising, adjust down if overfit
 cfg.SOLVER.STEPS = (1000, 1300)
 cfg.SOLVER.GAMMA = 0.05
 cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 64
-cfg.MODEL.ROI_HEADS.NUM_CLASSES = 20 #your number of classes + 1
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 20  #your number of classes + 1
 # cfg.TEST.EVAL_PERIOD = 500
 cfg.MODEL.RPN.NMS_THRESH = 0.8
 
@@ -79,8 +104,8 @@ logger = setup_logger(os.path.join(output_dir, cfg.TRAINING_NAME))
 create_pascal_db()
 
 # given an initial_set and test_set dataset
-register_coco_instances(
-    "initial_set", {}, train_data_dirs[1], train_data_dirs[0])
+register_coco_instances("initial_set", {}, train_data_dirs[1],
+                        train_data_dirs[0])
 register_coco_instances("test_set", {}, test_data_dirs[1], test_data_dirs[0])
 register_coco_instances("val_set", {}, val_data_dirs[1], val_data_dirs[0])
 
@@ -93,8 +118,8 @@ logger.info("Initial_set training complete")
 iteration = 100
 result_val = []
 result_test = []
-    # step 2
-    # evaluate the inital model and get worst performing class
+# step 2
+# evaluate the inital model and get worst performing class
 cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR + "/model_final.pth"
 model = create_model(cfg, "test")
 result = do_evaluate(cfg, model, output_dir)
@@ -105,17 +130,16 @@ i = 0
 try:
     while (i < iteration and budget > 0):
         # creating different flow for the different smi strategies
-        query_path, category = find_missclassified_object(
-            result['test_set'])
-        
+        query_path, category = find_missclassified_object(result['test_set'])
+
         # dynamic query images after each iteraion
         create_new_query(train_data_dirs, query_path, category)
 
         if (selection_strag != "margin"):
 
             if (selection_strag == "margin"):
-                subset_result = Margin_Sampling(
-                    lake_data_dirs[0], query_path, model, budget)
+                subset_result = Margin_Sampling(lake_data_dirs[0], query_path,
+                                                model, budget)
             elif (selection_strag != "random"):
                 # cropping and calculating the resnet embedding for the lake dataset images
 
@@ -127,21 +151,25 @@ try:
                     pass
 
                 if (i <= 40):
-                    crop_images_classwise_ground_truth(train_data_dirs[1], query_path, os.path.join(
-                        model_path, "query_images"), category)
+                    crop_images_classwise_ground_truth(
+                        train_data_dirs[1], query_path,
+                        os.path.join(model_path, "query_images"), category)
                     if selection_strag == 'cmi':
-                        crop_images_classwise_ground_truth(train_data_dirs[1], private_query_path, os.path.join(
-                        model_path, "query_images"), private_category)
+                        crop_images_classwise_ground_truth(
+                            train_data_dirs[1], private_query_path,
+                            os.path.join(model_path, "query_images"),
+                            private_category)
                 else:
                     crop_images_classwise(
-                        model, query_path, os.path.join(model_path, "query_images"))
-                db2 = Database(dir=os.path.join(model_path, "query_images"), csv=os.path.join(
-                    model_path, "data_query.csv"))
+                        model, query_path,
+                        os.path.join(model_path, "query_images"))
+                db2 = Database(dir=os.path.join(model_path, "query_images"),
+                               csv=os.path.join(model_path, "data_query.csv"))
 
                 # # removing the old images calculation
                 f_model = ResNetFeat()
                 query_set_embeddings = f_model.make_samples(
-                    db2, cache_path="query-"+str(i))
+                    db2, cache_path="query-" + str(i))
 
                 # removing the previous crop images
                 remove_dir(os.path.join(model_path, "lake_images"))
@@ -150,41 +178,49 @@ try:
                 except:
                     pass
                 # creating the new crop images
-                crop_images_classwise(
-                    model, lake_data_dirs[0], os.path.join(model_path, "lake_images"))
+                crop_images_classwise(model, lake_data_dirs[0],
+                                      os.path.join(model_path, "lake_images"))
                 db = Database(dir=os.path.join(model_path, "lake_images"),
                               csv=os.path.join(model_path, "data.csv"))
 
                 # Obtaining the new lake embedding using new trained model
                 lake_set_embeddings = f_model.make_samples(
-                    db, cache_path="lake-" + str(i), RES_model="resnet152", pick_layer="avg")
+                    db,
+                    cache_path="lake-" + str(i),
+                    RES_model="resnet152",
+                    pick_layer="avg")
 
-                AP, subset_result = infer_subset(
-                    query_set_embeddings, lake_set_embeddings, budget=selection_budget, strategy=selection_strag, clazz=category, private=None)
+                AP, subset_result = infer_subset(query_set_embeddings,
+                                                 lake_set_embeddings,
+                                                 budget=selection_budget,
+                                                 strategy=selection_strag,
+                                                 clazz=category,
+                                                 private=None)
 
                 subset_result = list(
                     set(get_original_images_path(subset_result)))
                 print(subset_result)
             else:
                 lake_image_list = os.listdir(lake_data_dirs[0])
-                subset_result = Random_wrapper(
-                    lake_image_list, selection_budget)
+                subset_result = Random_wrapper(lake_image_list,
+                                               selection_budget)
 
         # reducing the selection budget
         budget -= len(subset_result)
         if (budget > 0):
 
             # transferring images from lake set to train set
-            aug_train_subset(
-                subset_result, train_data_dirs[1], lake_data_dirs[1], budget, lake_data_dirs, train_data_dirs)
+            aug_train_subset(subset_result, train_data_dirs[1],
+                             lake_data_dirs[1], budget, lake_data_dirs,
+                             train_data_dirs)
             # image_list = get_category_details(
             #         subset_result, train_data_dirs, category)
             # category_selection.append([category[0], image_list])
             # print(category_selection)
         # removing the old training images from the detectron configuration and adding new one
         remove_dataset("initial_set")
-        register_coco_instances(
-            "initial_set", {}, train_data_dirs[1], train_data_dirs[0])
+        register_coco_instances("initial_set", {}, train_data_dirs[1],
+                                train_data_dirs[0])
 
         del model
         torch.cuda.empty_cache()
@@ -215,8 +251,9 @@ try:
                 temp = list(val.keys())
                 final_data.append(list(val.values()))
         csv = pd.DataFrame(final_data, columns=temp)
-        csv.to_csv(os.path.join(output_dir, '{}'.format(
-            "val_scores"+selection_strag+".csv")))
+        csv.to_csv(
+            os.path.join(output_dir,
+                         '{}'.format("val_scores" + selection_strag + ".csv")))
         final_data = []
         for it in result_test:
             print(it)
@@ -224,8 +261,9 @@ try:
                 temp = list(val.keys())
                 final_data.append(list(val.values()))
         csv = pd.DataFrame(final_data, columns=temp)
-        csv.to_csv(os.path.join(output_dir, '{}'.format(
-            "test_scores"+selection_strag+".csv")))
+        csv.to_csv(
+            os.path.join(output_dir, '{}'.format("test_scores" +
+                                                 selection_strag + ".csv")))
 except Exception as e:
     logger.error("Error while training:", e)
 
@@ -238,8 +276,9 @@ finally:
             temp = list(val.keys())
             final_data.append(list(val.values()))
     csv = pd.DataFrame(final_data, columns=temp)
-    csv.to_csv(os.path.join(output_dir, '{}'.format(
-        "val_scores"+selection_strag+".csv")))
+    csv.to_csv(
+        os.path.join(output_dir,
+                     '{}'.format("val_scores" + selection_strag + ".csv")))
     final_data = []
     for i in result_test:
         print(i)
@@ -247,8 +286,9 @@ finally:
             temp = list(val.keys())
             final_data.append(list(val.values()))
     csv = pd.DataFrame(final_data, columns=temp)
-    csv.to_csv(os.path.join(output_dir, '{}'.format(
-        "test_scores"+selection_strag+".csv")))
+    csv.to_csv(
+        os.path.join(output_dir,
+                     '{}'.format("test_scores" + selection_strag + ".csv")))
 
     # step 3
     # get embeddings for initial and lakeset from RESNET50

@@ -108,13 +108,14 @@ def crop_images_classwise(model: DefaultPredictor, src_path, dest_path,
     #         "0":"aeroplane", "1":"bicycle", "2":"bird", "3":"boat", "4":"bottle", "5":"bus", "6":"car", "7":"cat",
     #         "8":"chair", "9":"cow", "10":"diningtable", "11":"dog", "12":"horse", "13":"motorbike", "14":"person",
     #         "15":"pottedplant", "16":"sheep", "17":"sofa", "18":"train", "19":"tvmonitor"}
-    MAPPING = {
-        "0": "text",
-        "1": "title",
-        "2": "list",
-        "3": "table",
-        "4": "figure"
-    }
+    # MAPPING = {
+    #     "0": "text",
+    #     "1": "title",
+    #     "2": "list",
+    #     "3": "table",
+    #     "4": "figure"
+    # }
+    MAPPING = {"0":"bg", "1":"Image","2":"Math", "3":"Table", "4":"Text"}
     no_of_objects = 0
     for d in tqdm(os.listdir(src_path)):
         image = cv2.imread(os.path.join(src_path, d))
@@ -176,7 +177,8 @@ def crop_images_classwise_ground_truth(train_json_path, src_path, dest_path,
     #         "aeroplane":1, "bicycle":2, "bird":3, "boat":4, "bottle":5, "bus":6, "car":7, "cat":8,
     # "chair":9, "cow":10, "diningtable":11, "dog":12, "horse":13, "motorbike":14, "person":15,
     # "pottedplant":16, "sheep":17, "sofa":18, "train":19, "tvmonitor":20, "null":21}
-    MAPPING = {"text": 1, "title": 2, "list": 3, "table": 4, "figure": 5}
+    # MAPPING = {"text": 1, "title": 2, "list": 3, "table": 4, "figure": 5}
+    MAPPING = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
     no_of_objects = 0
     with open(train_json_path) as f:
         data = json.load(f)
@@ -222,7 +224,9 @@ def get_query_embedding(predictor: DefaultPredictor, image_dir: str,
     embeddings = []
     final_im_list = []
     with torch.no_grad():
-        MAPPING = {"text": 1, "title": 2, "list": 3, "table": 4, "figure": 5}
+        # MAPPING = {"text": 0, "title": 2, "list": 3, "table": 4, "figure": 5}
+        MAPPING = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
+
         no_of_objects = 0
         with open(train_json_path) as f:
             data = json.load(f)
