@@ -8,10 +8,6 @@ from submodlib import GraphCutMutualInformationFunction
 from submodlib import LogDeterminantMutualInformationFunction
 from submodlib import FacilityLocationConditionalMutualInformationFunction
 
-from detectron2.engine import DefaultPredictor
-from distil.active_learning_strategies.margin_sampling import MarginSampling
-
-
 def Random_wrapper(image_list, budget=10):
     rand_idx = np.random.permutation(len(image_list))[:budget]
     rand_idx = rand_idx.tolist()

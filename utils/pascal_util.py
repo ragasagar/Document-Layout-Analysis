@@ -1,15 +1,9 @@
 # import some common libraries
 from __future__ import annotations
-from tokenize import String
-from unicodedata import category
-from matplotlib import image
 import numpy as np
-import os, json, cv2, random, shutil
-import torch
+import os, json, random, shutil
 import random
 from os.path import exists
-import pandas as pd
-from detectron2.structures import Boxes, pairwise_iou
 import json
 
 from tqdm import tqdm

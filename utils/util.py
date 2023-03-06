@@ -1,10 +1,6 @@
-from email.mime import image
-import logging
 import os
-from collections import OrderedDict
 import torch
 from tqdm import tqdm
-from torch.nn.parallel import DistributedDataParallel
 from detectron2.structures import Boxes, pairwise_iou
 
 

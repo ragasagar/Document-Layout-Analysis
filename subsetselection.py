@@ -38,7 +38,6 @@ parser.add_argument("--device",   default="0", type=int, help="GPU device")
 parser.add_argument("--proposal_budget",   default="30", type=int, help="Proposal Budget for each image objects")
 parser.add_argument("--iterations",   default="40", type=int, help="Active learning iteration")
 arg = parser.parse_args()
-print(arg)
 query_path = 'query_data_img/'+ arg.category;
 category = [arg.category]
 torch.cuda.set_device(arg.device)
@@ -67,7 +66,7 @@ if (not os.path.exists(model_path)):
 
 # train a faster_rcnn model on the initial_set
 output_dir = os.path.join(model_path, "initial_training")
-config_file_path = '../publaynet/configs/publaynet/faster_rcnn_R_101_FPN_3x.yaml'
+config_file_path = '../dataset/configs/configs/publaynet/faster_rcnn_R_101_FPN_3x.yaml'
 selection_strag = arg.strategy
 selection_budget = arg.budget
 budget = arg.total_budget
@@ -100,11 +99,6 @@ category_ratio = {
     "table": .031,
     "figure": 0.05
 }
-
-# # getting the new lake set and train set
-# get_lakeset_images(dataset_dir, lake_data_dirs, int(arg.lake_size), category_ratio)
-# get_lakeset_images(init_train_dataset_dir,
-#                    train_data_dirs, int(arg.train_size), category_ratio)
 
 # Registering dataset intial_set for initial training, test_set and val_set for test and validation respectively.
 register_coco_instances(
@@ -233,7 +227,6 @@ try:
             # print(subset_result)
             subset_result = list(
                 set(get_original_images_path(subset_result)))
-            print(subset_result)
         else:
             lake_image_list = os.listdir(lake_data_dirs[0])
             subset_result = Random_wrapper(
