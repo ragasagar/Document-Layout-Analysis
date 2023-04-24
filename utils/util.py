@@ -51,7 +51,7 @@ def aug_train_subset(subset_result, train_data_json, lake_data_json, budget, src
     final_lake_annotations = list(filter(lambda x: x['image_id'] not in image_id, lake_dataset['annotations']))
 
     #moving data from lake set to train set.
-    change_dir_sanskrit(subset_result, src_dir, dest_dir)
+    change_dir(subset_result, src_dir, dest_dir)
 
     #changing the coco-file for annotations
     create_labels_update(train_image_list, train_annotations, categories, train_data_json)
@@ -363,10 +363,10 @@ def get_original_images_path_sanskrit(subset_result:list):
 def get_category_details(subset_result, train_data_dirs, category):
     with open(train_data_dirs[1], "r") as f:
         data = json.load(f);
-    # category_list = {
-    #     "text":1, "title":2, "list":3,"table":4, "figure":5
-    # }
-    category_list = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
+    category_list = {
+        "text":1, "title":2, "list":3,"table":4, "figure":5
+    }
+    # category_list = {"bg":0, "Image":1, "Math":2, "Table":3, "Text":4}
     images = [x['id'] for x in  data['images'] if x['file_name'] in subset_result]
     annotation = data['annotations']
     # final_lake_annotations = list(filter(lambda x: x['image_id'] in image_id, lake_dataset['annotations']))

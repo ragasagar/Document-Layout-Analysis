@@ -277,12 +277,11 @@ def subset(lake_data,
                                         stopIfNegativeGain=False,
                                         verbose=False)
     else:
-
+        rem_budget = 0
         if (len(lake_data) < budget):
             rem_budget = budget - len(lake_data) + 1
             budget = len(lake_data) - 1
 
-        rem_budget = 0
         if (strategry == "fl1mi"):
             subset = FL1MI_wrapper(lake_data,
                                    query_data,
